@@ -6,12 +6,15 @@
 
 После деплоя Modal печатает публичный URL вида https://<workspace>--ai-content-api-api.modal.build
 Приложение масштабируется до нуля (холодный старт несколько секунд), исходящий
-интернет из контейнера разрешён (Groq доступен). max_containers=1 — чтобы все
-запросы работали с одним SQLite-файлом контейнера.
+интернет из контейнера разрешён (Groq доступен). max_containers=1 + Volume /data —
+чтобы все запросы работали с одним постоянным SQLite-файлом (sqlite:////data/local.db).
 """
 import modal
 
 app = modal.App("ai-content-api")
+
+# Постоянный том: SQLite-файл переживает холодные старты контейнера.
+volume = modal.Volume.from_name("ai-content-db", create_if_missing=True)
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
@@ -33,6 +36,7 @@ image = (
     image=image,
     secrets=[modal.Secret.from_name("ai-content-secrets")],
     max_containers=1,
+    volumes={"/data": volume},
 )
 @modal.asgi_app()
 def api():
