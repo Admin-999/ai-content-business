@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ru" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Контент — готовые тексты для вашего бизнеса за 30 секунд</title>
+  <meta name="description" content="Посты для соцсетей, статьи для блога и описания товаров с помощью ИИ. 5 генераций в день бесплатно, без карты.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
+
+  <!-- Навигация -->
+  <header class="sticky top-0 z-40 border-b border-white/10 bg-slate-950/80 backdrop-blur">
+    <nav class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+      <a href="#" class="text-xl font-bold">
+        <span class="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">AI Контент</span>
+      </a>
+      <div class="hidden items-center gap-6 text-sm text-slate-300 md:flex">
+        <a href="#how" class="hover:text-white">Как работает</a>
+        <a href="#pricing" class="hover:text-white">Тарифы</a>
+        <a href="#faq" class="hover:text-white">Вопросы</a>
+        <a href="terms.html" class="hover:text-white">Документы</a>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="loginBtn" class="rounded-lg px-4 py-2 text-sm font-medium text-slate-200 hover:bg-white/10">Войти</button>
+        <button id="startBtn" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Начать бесплатно</button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <section class="mx-auto max-w-6xl px-4 pb-20 pt-16 text-center md:pt-24">
+    <span class="inline-block rounded-full border border-indigo-500/30 bg-indigo-500/10 px-4 py-1.5 text-xs font-medium text-indigo-300">
+      Работает на бесплатных AI-моделях — Gemini и Groq
+    </span>
+    <h1 class="mx-auto mt-6 max-w-3xl text-4xl font-extrabold leading-tight md:text-6xl">
+      Готовый контент для вашего бизнеса
+      <span class="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">за 30 секунд</span>
+    </h1>
+    <p class="mx-auto mt-6 max-w-2xl text-lg text-slate-400">
+      Посты для соцсетей, статьи для блога и описания товаров — генерируются автоматически.
+      Введите тему и получите текст, готовый к публикации.
+    </p>
+    <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+      <button data-auth="register" class="w-full rounded-xl bg-indigo-600 px-8 py-3.5 font-semibold text-white hover:bg-indigo-500 sm:w-auto">
+        Попробовать бесплатно
+      </button>
+      <a href="#pricing" class="w-full rounded-xl border border-white/15 px-8 py-3.5 font-semibold text-slate-200 hover:bg-white/10 sm:w-auto">
+        Смотреть тарифы
+      </a>
+    </div>
+    <p class="mt-4 text-sm text-slate-500">5 генераций в день бесплатно. Без карты. Без установки.</p>
+    <div class="mx-auto mt-12 grid max-w-3xl grid-cols-3 gap-4 text-center">
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
+        <div class="text-2xl font-bold text-indigo-300">3</div>
+        <div class="mt-1 text-xs text-slate-400">типа контента</div>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
+        <div class="text-2xl font-bold text-indigo-300">5/день</div>
+        <div class="mt-1 text-xs text-slate-400">бесплатно</div>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
+        <div class="text-2xl font-bold text-indigo-300">30 сек</div>
+        <div class="mt-1 text-xs text-slate-400">и текст готов</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Что генерируем -->
+  <section class="mx-auto max-w-6xl px-4 pb-20">
+    <h2 class="text-center text-3xl font-bold">Что вы получаете</h2>
+    <div class="mt-10 grid gap-6 md:grid-cols-3">
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6">
+        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/15">
+          <svg class="h-6 w-6 text-indigo-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <h3 class="mt-4 text-lg font-semibold">Посты для соцсетей</h3>
+        <p class="mt-2 text-sm text-slate-400">Вовлекающие посты с цепляющим началом, призывом к действию и хештегами. Для ВКонтакте, Telegram и Instagram.</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6">
+        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/15">
+          <svg class="h-6 w-6 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <h3 class="mt-4 text-lg font-semibold">Статьи для блога</h3>
+        <p class="mt-2 text-sm text-slate-400">SEO-статьи со структурой, подзаголовками и практическими советами. 500–800 слов за один запрос.</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6">
+        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-fuchsia-500/15">
+          <svg class="h-6 w-6 text-fuchsia-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.83z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        </div>
+        <h3 class="mt-4 text-lg font-semibold">Описания товаров</h3>
+        <p class="mt-2 text-sm text-slate-400">Продающие карточки товаров с выгодами списком и призывом к действию. Для магазинов и маркетплейсов.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Как работает -->
+  <section id="how" class="mx-auto max-w-6xl px-4 pb-20">
+    <h2 class="text-center text-3xl font-bold">Как это работает</h2>
+    <div class="mt-10 grid gap-6 md:grid-cols-3">
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6 text-center">
+        <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 font-bold">1</div>
+        <h3 class="mt-4 font-semibold">Зарегистрируйтесь</h3>
+        <p class="mt-2 text-sm text-slate-400">Email и пароль — 20 секунд. Карта не нужна, на старте 5 бесплатных генераций в день.</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6 text-center">
+        <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 font-bold">2</div>
+        <h3 class="mt-4 font-semibold">Введите тему</h3>
+        <p class="mt-2 text-sm text-slate-400">Например: «скидка 20% на сезонное обслуживание кондиционеров». Выберите тип и тон текста.</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6 text-center">
+        <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 font-bold">3</div>
+        <h3 class="mt-4 font-semibold">Получите текст</h3>
+        <p class="mt-2 text-sm text-slate-400">Через 10–30 секунд текст готов. Копируйте и публикуйте. История сохраняется в кабинете.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Тарифы -->
+  <section id="pricing" class="mx-auto max-w-6xl px-4 pb-20">
+    <h2 class="text-center text-3xl font-bold">Тарифы</h2>
+    <p class="mt-3 text-center text-slate-400">Начните бесплатно, переходите на PRO, когда сервис начнёт приносить вам деньги.</p>
+    <div class="mx-auto mt-10 grid max-w-3xl gap-6 md:grid-cols-2">
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-8">
+        <h3 class="text-lg font-semibold">Free</h3>
+        <div class="mt-3 flex items-end gap-1">
+          <span class="text-4xl font-extrabold">0 ₽</span>
+          <span class="pb-1 text-sm text-slate-400">/ навсегда</span>
+        </div>
+        <ul class="mt-6 space-y-3 text-sm text-slate-300">
+          <li class="flex gap-2"><svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>5 генераций в день</li>
+          <li class="flex gap-2"><svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Посты, статьи, описания товаров</li>
+          <li class="flex gap-2"><svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>История генераций</li>
+          <li class="flex gap-2"><svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Без банковской карты</li>
+        </ul>
+        <button data-auth="register" class="mt-8 w-full rounded-xl border border-white/15 px-4 py-3 font-semibold text-slate-100 hover:bg-white/10">Создать аккаунт</button>
+      </div>
+      <div class="relative rounded-2xl border border-indigo-500/50 bg-gradient-to-b from-indigo-500/10 to-slate-900/60 p-8">
+        <span class="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold">Выбор малого бизнеса</span>
+        <h3 class="text-lg font-semibold">PRO</h3>
+        <div class="mt-3 flex items-end gap-1">
+          <span class="text-4xl font-extrabold">990 ₽</span>
+          <span class="pb-1 text-sm text-slate-400">/ месяц</span>
+        </div>
+        <ul class="mt-6 space-y-3 text-sm text-slate-300">
+          <li class="flex gap-2"><svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>100 генераций в день</li>
+          <li class="flex gap-2"><svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Приоритетная модель Gemini</li>
+          <li class="flex gap-2"><svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Все типы контента без ограничений</li>
+          <li class="flex gap-2"><svg class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Отмена в любой момент</li>
+        </ul>
+        <button data-upgrade class="mt-8 w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white hover:bg-indigo-500">Оформить PRO</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="mx-auto max-w-3xl px-4 pb-20">
+    <h2 class="text-center text-3xl font-bold">Частые вопросы</h2>
+    <div class="mt-8 space-y-3">
+      <details class="rounded-xl border border-white/10 bg-slate-900/60 p-5">
+        <summary class="font-medium">Это правда бесплатно?</summary>
+        <p class="mt-3 text-sm text-slate-400">Да. Тариф Free даёт 5 генераций в день без карты и без срока действия. Тариф PRO нужен тем, кому нужно больше — 100 генераций в день.</p>
+      </details>
+      <details class="rounded-xl border border-white/10 bg-slate-900/60 p-5">
+        <summary class="font-medium">Кому принадлежат сгенерированные тексты?</summary>
+        <p class="mt-3 text-sm text-slate-400">Вам. Используйте их для соцсетей, блогов, карточек товаров и рекламы без ограничений.</p>
+      </details>
+      <details class="rounded-xl border border-white/10 bg-slate-900/60 p-5">
+        <summary class="font-medium">Насколько качественный контент?</summary>
+        <p class="mt-3 text-sm text-slate-400">Используются современные модели Google Gemini (резерв — Groq). Тексты получаются публикационно готовыми, но мы рекомендуем вычитывать их перед публикацией: ИИ может ошибаться в фактах.</p>
+      </details>
+      <details class="rounded-xl border border-white/10 bg-slate-900/60 p-5">
+        <summary class="font-medium">Как работает оплата?</summary>
+        <p class="mt-3 text-sm text-slate-400">Сейчас платежи работают в тестовом режиме: PRO активируется без списания денег. К запуску в продакшен подключается Stripe Checkout — форма оплаты уже подготовлена.</p>
+      </details>
+      <details class="rounded-xl border border-white/10 bg-slate-900/60 p-5">
+        <summary class="font-medium">Можно ли отменить подписку?</summary>
+        <p class="mt-3 text-sm text-slate-400">Да, подписка действует 30 дней и не продлевается автоматически без вашего участия. После окончания лимит возвращается к бесплатным 5 генерациям в день.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- Футер -->
+  <footer class="border-t border-white/10 bg-slate-950">
+    <div class="mx-auto grid max-w-6xl gap-8 px-4 py-12 md:grid-cols-3">
+      <div>
+        <div class="text-lg font-bold"><span class="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">AI Контент</span></div>
+        <p class="mt-3 text-sm text-slate-400">Автоматическая генерация контента для малого бизнеса: посты, статьи, описания товаров.</p>
+      </div>
+      <div class="text-sm">
+        <div class="font-semibold text-slate-200">Сервис</div>
+        <ul class="mt-3 space-y-2 text-slate-400">
+          <li><a href="#how" class="hover:text-white">Как работает</a></li>
+          <li><a href="#pricing" class="hover:text-white">Тарифы</a></li>
+          <li><a href="#faq" class="hover:text-white">Вопросы</a></li>
+        </ul>
+      </div>
+      <div class="text-sm">
+        <div class="font-semibold text-slate-200">Документы</div>
+        <ul class="mt-3 space-y-2 text-slate-400">
+          <li><a href="terms.html" class="hover:text-white">Условия использования</a></li>
+          <li><a href="privacy.html" class="hover:text-white">Политика конфиденциальности</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="border-t border-white/5 px-4 py-6 text-center text-xs text-slate-500">
+      © 2026 AI Контент. Работает на бесплатном стеке: Vercel, Render, Supabase, Google Gemini, Resend.
+    </div>
+  </footer>
+
+  <!-- Модальное окно входа / регистрации -->
+  <div id="authModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4">
+    <div class="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6">
+      <div class="flex items-center justify-between">
+        <div class="flex gap-1 rounded-xl bg-slate-800 p-1">
+          <button id="tabLogin" class="auth-tab rounded-lg px-4 py-1.5 text-sm font-medium">Вход</button>
+          <button id="tabRegister" class="auth-tab rounded-lg px-4 py-1.5 text-sm font-medium">Регистрация</button>
+        </div>
+        <button id="authClose" class="text-2xl leading-none text-slate-400 hover:text-white" aria-label="Закрыть">&times;</button>
+      </div>
+
+      <form id="loginForm" class="mt-6 hidden space-y-4">
+        <div>
+          <label for="loginEmail" class="mb-1 block text-sm text-slate-300">Email</label>
+          <input id="loginEmail" type="email" class="field" autocomplete="email" placeholder="you@company.ru">
+        </div>
+        <div>
+          <label for="loginPassword" class="mb-1 block text-sm text-slate-300">Пароль</label>
+          <input id="loginPassword" type="password" class="field" autocomplete="current-password" placeholder="Ваш пароль">
+        </div>
+        <p id="loginError" class="hidden text-sm text-rose-400"></p>
+        <button type="submit" class="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white hover:bg-indigo-500 disabled:opacity-60">Войти</button>
+      </form>
+
+      <form id="registerForm" class="mt-6 hidden space-y-4">
+        <div>
+          <label for="regEmail" class="mb-1 block text-sm text-slate-300">Email</label>
+          <input id="regEmail" type="email" class="field" autocomplete="email" placeholder="you@company.ru">
+        </div>
+        <div>
+          <label for="regPassword" class="mb-1 block text-sm text-slate-300">Пароль</label>
+          <input id="regPassword" type="password" class="field" autocomplete="new-password" placeholder="Минимум 8 символов">
+          <p class="mt-1 text-xs text-slate-500">От 8 до 64 символов. Карта не требуется.</p>
+        </div>
+        <p id="regError" class="hidden text-sm text-rose-400"></p>
+        <button type="submit" class="w-full rounded-xl bg-indigo-600 px-4 py-3 font-semibold text-white hover:bg-indigo-500 disabled:opacity-60">Создать аккаунт</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+</body>
+</html>

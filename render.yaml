@@ -1,0 +1,30 @@
+# Blueprint для автодеплоя backend на Render.com (free tier).
+# В Render: New + -> Blueprint -> выберите этот репозиторий -> Apply.
+services:
+  - type: web
+    name: ai-content-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL            # Supabase: Settings -> Database -> Connection string (URI, порт 6543)
+        sync: false
+      - key: SECRET_KEY              # генерируется автоматически
+        generateValue: true
+      - key: CRON_SECRET             # генерируется автоматически (скопируйте в секреты GitHub)
+        generateValue: true
+      - key: GEMINI_API_KEY          # aistudio.google.com -> Get API key
+        sync: false
+      - key: GROQ_API_KEY            # необязательно, резервный провайдер
+        sync: false
+      - key: FRONTEND_ORIGIN         # после деплоя фронтенда: https://<ваш-проект>.vercel.app
+        sync: false
+      - key: FRONTEND_URL            # тот же адрес, используется в письмах
+        sync: false
+      - key: RESEND_API_KEY          # необязательно, для email-отчётов
+        sync: false
+      - key: EMAIL_FROM
+        value: "AI Контент <onboarding@resend.dev>"

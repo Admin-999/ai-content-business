@@ -1,0 +1,67 @@
+/* Кастомные стили поверх Tailwind (CDN). */
+
+/* Поля ввода */
+.field {
+  width: 100%;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  color: #f1f5f9;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+.field:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+.field::placeholder { color: #64748b; }
+select.field option { background: #0f172a; }
+
+/* Активная вкладка в модалке авторизации */
+.auth-tab.active { background: #4f46e5; color: #fff; }
+
+/* details/summary без штатного маркера */
+details > summary { list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+
+/* Фоновые градиенты */
+body {
+  background-image:
+    radial-gradient(60rem 30rem at 80% -10%, rgba(99, 102, 241, 0.15), transparent),
+    radial-gradient(50rem 25rem at -10% 10%, rgba(139, 92, 246, 0.12), transparent);
+  background-attachment: fixed;
+}
+
+/* Тост-уведомления (классы цвета задаёт JS) */
+#toast {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 60;
+  max-width: 22rem;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateY(0); }
+
+/* Спиннер кнопки генерации */
+.spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }

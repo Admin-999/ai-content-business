@@ -1,0 +1,20 @@
+# Секреты и окружение
+.env
+backend/.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Локальные БД
+*.db
+*.sqlite
+
+# Node / деплой
+node_modules/
+.vercel/
+
+# Служебное
+.DS_Store
