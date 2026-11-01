@@ -20,6 +20,12 @@ services:
         sync: false
       - key: GROQ_API_KEY            # необязательно, резервный провайдер
         sync: false
+      - key: OPENAI_COMPAT_BASE_URL  # необязательно: универсальный резерв (OpenRouter и др.)
+        sync: false
+      - key: OPENAI_COMPAT_API_KEY
+        sync: false
+      - key: OPENAI_COMPAT_MODEL
+        sync: false
       - key: FRONTEND_ORIGIN         # после деплоя фронтенда: https://<ваш-проект>.vercel.app
         sync: false
       - key: FRONTEND_URL            # тот же адрес, используется в письмах

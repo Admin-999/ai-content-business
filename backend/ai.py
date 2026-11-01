@@ -1,11 +1,19 @@
 """Генерация текста через бесплатные LLM API.
 
-Цепочка провайдеров: Google Gemini (основной) -> Groq (резерв).
-Если один недоступен, автоматически пробуется второй.
+Цепочка провайдеров: Google Gemini -> Groq -> универсальный OpenAI-совместимый
+(OpenRouter, GitHub Models и любые другие). Работают те, у кого задан ключ.
 """
 import httpx
 
-from config import GEMINI_API_KEY, GEMINI_MODEL, GROQ_API_KEY, GROQ_MODEL
+from config import (
+    GEMINI_API_KEY,
+    GEMINI_MODEL,
+    GROQ_API_KEY,
+    GROQ_MODEL,
+    OPENAI_COMPAT_API_KEY,
+    OPENAI_COMPAT_BASE_URL,
+    OPENAI_COMPAT_MODEL,
+)
 
 TIMEOUT = httpx.Timeout(60.0)
 
@@ -96,6 +104,27 @@ def _call_groq(client: httpx.Client, prompt: str) -> str:
     return text
 
 
+def _call_openai_compat(client: httpx.Client, prompt: str) -> str:
+    """Любой OpenAI-совместимый провайдер: OpenRouter, GitHub Models и т.п."""
+    resp = client.post(
+        f"{OPENAI_COMPAT_BASE_URL}/chat/completions",
+        headers={"Authorization": f"Bearer {OPENAI_COMPAT_API_KEY}"},
+        json={
+            "model": OPENAI_COMPAT_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.8,
+            "max_tokens": 2048,
+        },
+    )
+    if resp.status_code != 200:
+        raise AIError(f"AI HTTP {resp.status_code}: {resp.text[:200]}")
+    choices = resp.json().get("choices") or [{}]
+    text = (choices[0].get("message") or {}).get("content", "").strip()
+    if not text:
+        raise AIError("AI-провайдер вернул пустой ответ")
+    return text
+
+
 def generate_content(topic: str, content_type: str, tone: str = "дружелюбный", language: str = "ru"):
     """Возвращает (текст, имя_модели). Пробует провайдеров по очереди."""
     prompt = build_prompt(topic, content_type, tone, language)
@@ -104,6 +133,8 @@ def generate_content(topic: str, content_type: str, tone: str = "дружелю�
         providers.append((f"gemini:{GEMINI_MODEL}", _call_gemini))
     if GROQ_API_KEY:
         providers.append((f"groq:{GROQ_MODEL}", _call_groq))
+    if OPENAI_COMPAT_BASE_URL and OPENAI_COMPAT_API_KEY and OPENAI_COMPAT_MODEL:
+        providers.append((f"compat:{OPENAI_COMPAT_MODEL}", _call_openai_compat))
     if not providers:
         raise AIError("Не настроен ни один AI-провайдер. Добавьте GEMINI_API_KEY или GROQ_API_KEY.")
 

@@ -33,6 +33,10 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# Универсальный резерв: любой OpenAI-совместимый API (OpenRouter, GitHub Models и др.)
+OPENAI_COMPAT_BASE_URL = os.getenv("OPENAI_COMPAT_BASE_URL", "").rstrip("/")
+OPENAI_COMPAT_API_KEY = os.getenv("OPENAI_COMPAT_API_KEY", "").strip()
+OPENAI_COMPAT_MODEL = os.getenv("OPENAI_COMPAT_MODEL", "")
 
 # --- CORS ---
 # Адреса frontend через запятую. В продакшене укажите URL с Vercel, например:
