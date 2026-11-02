@@ -36,6 +36,9 @@ image = (
     image=image,
     secrets=[modal.Secret.from_name("ai-content-secrets")],
     max_containers=1,
+    cpu=0.5,
+    memory=256,
+    container_idle_timeout=900,
     volumes={"/data": volume},
 )
 @modal.asgi_app()
