@@ -21,7 +21,7 @@ async function api(path, { method = "GET", body = null, auth = true } = {}) {
   try {
     resp = await fetch(API_URL + path, { method, headers, body: body ? JSON.stringify(body) : null });
   } catch (e) {
-    throw new Error("Нет связи с сервером. Проверьте интернет и что backend запущен.");
+    throw new Error("Сервер не отвечает — возможно, он просыпается после паузы. Подождите минуту и нажмите кнопку ещё раз.");
   }
 
   let data = null;

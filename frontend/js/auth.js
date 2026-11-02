@@ -31,6 +31,18 @@ function showAuthError(elId, message) {
   el.classList.remove("hidden");
 }
 
+function setBtnLoading(btn, loading, text) {
+  if (!btn) return;
+  if (loading) {
+    btn.dataset.label = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>' + text;
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = btn.dataset.label || btn.innerHTML;
+  }
+}
+
 function saveSession(data) {
   localStorage.setItem("ac_token", data.token);
   localStorage.setItem("ac_email", data.email || "");
@@ -51,11 +63,14 @@ if (authModal) {
     const password = document.getElementById("loginPassword").value;
     document.getElementById("loginError").classList.add("hidden");
     if (!email || !password) return showAuthError("loginError", "Заполните email и пароль.");
+    const btn = loginForm.querySelector('button[type="submit"]');
+    setBtnLoading(btn, true, "Входим, подождите до 1 минуты…");
     try {
       const data = await api("/api/auth/login", { method: "POST", auth: false, body: { email, password } });
       saveSession(data);
     } catch (err) {
       showAuthError("loginError", err.message);
+      setBtnLoading(btn, false);
     }
   });
 
@@ -68,11 +83,14 @@ if (authModal) {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return showAuthError("regError", "Введите корректный email.");
     if (password.length < 8) return showAuthError("regError", "Пароль должен быть не короче 8 символов.");
     if (password.length > 64) return showAuthError("regError", "Пароль должен быть не длиннее 64 символов.");
+    const btn = registerForm.querySelector('button[type="submit"]');
+    setBtnLoading(btn, true, "Создаём аккаунт, подождите до 1 минуты…");
     try {
       const data = await api("/api/auth/register", { method: "POST", auth: false, body: { email, password } });
       saveSession(data);
     } catch (err) {
       showAuthError("regError", err.message);
+      setBtnLoading(btn, false);
     }
   });
 }
