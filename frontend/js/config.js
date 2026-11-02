@@ -1,6 +1,5 @@
 // ============ НАСТРОЙКА ПОСЛЕ ДЕПЛОЯ ============
-// Замените значение API_URL на адрес вашего backend с Render, например:
-//   API_URL: "https://ai-content-api.onrender.com"
+// Backend работает на Modal (деплой через GitHub Actions: Deploy backend (Modal)).
 window.APP_CONFIG = {
-  API_URL: "http://localhost:8000"
+  API_URL: "https://vsvolodin2014--ai-content-api-api.us-east.modal.run"
 };
