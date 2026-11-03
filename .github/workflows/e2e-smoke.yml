@@ -74,4 +74,12 @@ jobs:
           echo "$C6"
           test "$C6" = "403"
 
+          echo "=== 8. Обычная генерация -> 200 ==="
+          C7=$(curl -s --max-time 120 -o /tmp/r7.json -w "%{http_code}" -X POST "$B/api/generate" \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+            -d '{"topic":"Тестовая тема про свежий кофе","content_type":"post"}')
+          echo "$C7"
+          jq -c '{model, len: (.content|length), remaining}' /tmp/r7.json
+          test "$C7" = "200"
+
           echo "ALL E2E PASSED"

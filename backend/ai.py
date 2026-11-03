@@ -131,15 +131,15 @@ def _call_openai_compat(client: httpx.Client, prompt: str) -> str:
     return _chat_text(resp.json(), "AI-провайдер")
 
 
-def _text_providers():
-    """Список (метка, функция) текстовых провайдеров, у которых задан ключ."""
+def _text_providers(prompt: str):
+    """Список (метка, функция(client)) текстовых провайдеров с замыканием на промпт."""
     providers = []
     if GEMINI_API_KEY:
-        providers.append((f"gemini:{GEMINI_MODEL}", _call_gemini))
+        providers.append((f"gemini:{GEMINI_MODEL}", lambda c: _call_gemini(c, prompt)))
     if GROQ_API_KEY:
-        providers.append((f"groq:{GROQ_MODEL}", _call_groq))
+        providers.append((f"groq:{GROQ_MODEL}", lambda c: _call_groq(c, prompt)))
     if OPENAI_COMPAT_BASE_URL and OPENAI_COMPAT_API_KEY and OPENAI_COMPAT_MODEL:
-        providers.append((f"compat:{OPENAI_COMPAT_MODEL}", _call_openai_compat))
+        providers.append((f"compat:{OPENAI_COMPAT_MODEL}", lambda c: _call_openai_compat(c, prompt)))
     if not providers:
         raise AIError("Не настроен ни один AI-провайдер. Добавьте GEMINI_API_KEY или GROQ_API_KEY.")
     return providers
@@ -159,7 +159,7 @@ def _run_chain(providers):
 
 def run_prompt(prompt: str):
     """Базовый вызов LLM: один промпт без системной роли."""
-    return _run_chain(_text_providers())
+    return _run_chain(_text_providers(prompt))
 
 
 def generate_content(topic: str, content_type: str, tone: str = "дружелюбный", language: str = "ru"):
