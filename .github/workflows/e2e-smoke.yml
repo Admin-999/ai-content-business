@@ -23,8 +23,9 @@ jobs:
           echo "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAeklEQVR4nO3PUQkAIBTAQBMZ1FfaEH4cwmABbmvP+brFBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQwHjEy8AF+uQxLRARc80AAAAASUVORK5CYII=" | base64 -d > /tmp/item.png
 
           echo "=== 1. Регистрация тестового пользователя ==="
+          E2E_EMAIL="e2e$(date +%s)@test.local"
           REG=$(curl -s --max-time 120 -X POST "$B/api/auth/register" -H "Content-Type: application/json" \
-            -d '{"email":"automation3@test.local","password":"test12345"}')
+            -d "{\"email\":\"$E2E_EMAIL\",\"password\":\"test12345\"}")
           echo "$REG" | jq -c '{email, plan}'
           TOKEN=$(echo "$REG" | jq -r .token)
           test "$TOKEN" != "null" && test -n "$TOKEN"
