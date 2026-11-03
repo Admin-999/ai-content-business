@@ -1,0 +1,69 @@
+name: E2E smoke (временный)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Прогнать E2E-тесты живого API
+        shell: bash
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+        run: |
+          set -e
+          B="$BACKEND_URL"
+          echo "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAeklEQVR4nO3PUQkAIBTAQBMZ1FfaEH4cwmABbmvP+brFBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQwHjEy8AF+uQxLRARc80AAAAASUVORK5CYII=" | base64 -d > /tmp/item.png
+
+          echo "=== 1. Регистрация тестового пользователя ==="
+          REG=$(curl -s --max-time 120 -X POST "$B/api/auth/register" -H "Content-Type: application/json" \
+            -d '{"email":"automation2@test.local","password":"test12345"}')
+          echo "$REG" | jq -c '{email, plan}'
+          TOKEN=$(echo "$REG" | jq -r .token)
+          test "$TOKEN" != "null" && test -n "$TOKEN"
+
+          echo "=== 2. Канал с неверным токеном -> 422 ==="
+          C1=$(curl -s --max-time 60 -o /tmp/r1.json -w "%{http_code}" -X POST "$B/api/channels" \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+            -d '{"title":"Тестовый канал","description":"Канал о домашней выпечке и кофе","bot_token":"123456789:AAInvalidTokenForE2ETest0000000","channel_username":"@no_such_ch_918273","tone":"дружелюбный","interval_hours":12}')
+          echo "$C1 $(cat /tmp/r1.json)"
+          test "$C1" = "422"
+
+          echo "=== 3. Бот с неверным токеном -> 422 ==="
+          C2=$(curl -s --max-time 60 -o /tmp/r2.json -w "%{http_code}" -X POST "$B/api/bots" \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+            -d '{"name":"Тестовый бот","role":"Поддержка клиентов","tone":"дружелюбный","knowledge":"Магазин подарков, работаем ежедневно с 10 до 20","bot_token":"123456789:AAInvalidTokenForE2ETest0000000"}')
+          echo "$C2 $(cat /tmp/r2.json)"
+          test "$C2" = "422"
+
+          echo "=== 4. WB connect с неверным токеном -> 422 ==="
+          C3=$(curl -s --max-time 60 -o /tmp/r3.json -w "%{http_code}" -X POST "$B/api/wb/connect" \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+            -d '{"api_token":"eyJhbGciOiInvalidWbTokenForE2ETest0000000000"}')
+          echo "$C3 $(cat /tmp/r3.json)"
+          test "$C3" = "422"
+
+          echo "=== 5. Карточка WB из фото -> 200 ==="
+          C4=$(curl -s --max-time 300 -o /tmp/r4.json -w "%{http_code}" -X POST "$B/api/wb/cards" \
+            -H "Authorization: Bearer $TOKEN" \
+            -F "photo=@/tmp/item.png;type=image/png" \
+            -F "name=Кружка керамическая 350 мл, бирюзовая" \
+            -F "price_rub=590")
+          echo "HTTP $C4"
+          jq -c '{publish_status, chars: (.characteristics|length), desc120: (.description[:120]), keywords: (.keywords[:60]), used_today, limit, model, vision_model}' /tmp/r4.json
+          test "$C4" = "200"
+
+          echo "=== 6. Autopost с неверным секретом -> 403 ==="
+          C5=$(curl -s --max-time 60 -o /dev/null -w "%{http_code}" -X POST "$B/api/cron/autopost" -H "X-Cron-Secret: wrong-secret")
+          echo "$C5"
+          test "$C5" = "403"
+
+          echo "=== 7. Webhook бота с неверным секретом -> 403 ==="
+          C6=$(curl -s --max-time 60 -o /dev/null -w "%{http_code}" -X POST "$B/api/bot-webhook/00000000-0000-0000-0000-000000000000" \
+            -H "X-Telegram-Bot-Api-Secret-Token: wrong" -H "Content-Type: application/json" \
+            -d '{"message":{"chat":{"id":12345},"text":"привет"}}')
+          echo "$C6"
+          test "$C6" = "403"
+
+          echo "ALL E2E PASSED"
