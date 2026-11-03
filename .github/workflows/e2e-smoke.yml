@@ -18,7 +18,7 @@ jobs:
 
           echo "=== 1. Регистрация тестового пользователя ==="
           REG=$(curl -s --max-time 120 -X POST "$B/api/auth/register" -H "Content-Type: application/json" \
-            -d '{"email":"automation2@test.local","password":"test12345"}')
+            -d '{"email":"automation3@test.local","password":"test12345"}')
           echo "$REG" | jq -c '{email, plan}'
           TOKEN=$(echo "$REG" | jq -r .token)
           test "$TOKEN" != "null" && test -n "$TOKEN"
@@ -51,6 +51,7 @@ jobs:
             -F "name=Кружка керамическая 350 мл, бирюзовая" \
             -F "price_rub=590")
           echo "HTTP $C4"
+          cat /tmp/r4.json; echo
           jq -c '{publish_status, chars: (.characteristics|length), desc120: (.description[:120]), keywords: (.keywords[:60]), used_today, limit, model, vision_model}' /tmp/r4.json
           test "$C4" = "200"
 
