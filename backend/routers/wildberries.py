@@ -218,6 +218,11 @@ def create_card(
             status_code=502,
             detail=f"Сервис генерации временно недоступен, попробуйте ещё раз через минуту. ({e})",
         )
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Сбой генерации карточки: {type(e).__name__}: {str(e)[:250]}",
+        )
     description = str(card.get("description") or "").strip()
     characteristics = card.get("characteristics") or []
     keywords = str(card.get("keywords") or "").strip()
