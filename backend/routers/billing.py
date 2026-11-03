@@ -17,10 +17,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 import database
-from config import PRO_DAILY_LIMIT, PRO_PERIOD_DAYS, PRO_PRICE_RUB
+from config import PRO_DAILY_LIMIT, PRO_PERIOD_DAYS, PRO_PRICE_RUB, PRO_PLUS_DAILY_LIMIT, PRO_PLUS_PRICE_RUB
 from deps import get_current_user, new_id, utcnow
 
 router = APIRouter(prefix="/api", tags=["billing"])
+
+PLANS = {
+    "pro": {"title": "PRO", "price": PRO_PRICE_RUB, "limit": PRO_DAILY_LIMIT},
+    "pro_plus": {"title": "PRO+", "price": PRO_PLUS_PRICE_RUB, "limit": PRO_PLUS_DAILY_LIMIT},
+}
 
 
 class SubscribeIn(BaseModel):
@@ -33,8 +38,9 @@ class SubscribeIn(BaseModel):
 
 @router.post("/subscribe")
 def subscribe(body: SubscribeIn, user: dict = Depends(get_current_user)):
-    if body.plan != "pro":
-        raise HTTPException(status_code=422, detail="Доступен только тариф 'pro'.")
+    plan = PLANS.get(body.plan)
+    if not plan:
+        raise HTTPException(status_code=422, detail="Доступны тарифы 'pro' и 'pro_plus'.")
 
     now = utcnow()
     expires = now + datetime.timedelta(days=PRO_PERIOD_DAYS)
@@ -42,21 +48,21 @@ def subscribe(body: SubscribeIn, user: dict = Depends(get_current_user)):
 
     database.execute(
         "INSERT INTO subscriptions (id, user_id, plan, status, amount_rub, payment_ref, started_at, expires_at) "
-        "VALUES (%s, %s, 'pro', 'active', %s, %s, %s, %s)",
-        (new_id(), user["id"], PRO_PRICE_RUB, payment_ref, now, expires),
+        "VALUES (%s, %s, %s, 'active', %s, %s, %s, %s)",
+        (new_id(), user["id"], body.plan, plan["price"], payment_ref, now, expires),
     )
     database.execute(
-        "UPDATE users SET plan = 'pro', plan_expires_at = %s WHERE id = %s",
-        (expires, user["id"]),
+        "UPDATE users SET plan = %s, plan_expires_at = %s WHERE id = %s",
+        (body.plan, expires, user["id"]),
     )
     return {
         "status": "active",
-        "plan": "pro",
-        "price_rub": PRO_PRICE_RUB,
-        "daily_limit": PRO_DAILY_LIMIT,
+        "plan": body.plan,
+        "price_rub": plan["price"],
+        "daily_limit": plan["limit"],
         "expires_at": expires.isoformat(),
         "payment_ref": payment_ref,
-        "message": f"Тариф PRO активирован (тестовый режим, деньги не списаны). Лимит: {PRO_DAILY_LIMIT} генераций в день.",
+        "message": f"Тариф {plan['title']} активирован (тестовый режим, деньги не списаны). Лимит: {plan['limit']} генераций в день.",
     }
 
 

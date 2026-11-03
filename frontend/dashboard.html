@@ -87,13 +87,19 @@
       </div>
 
       <div id="upgradeCard" class="rounded-2xl border border-indigo-500/40 bg-indigo-500/10 p-6">
-        <h2 class="font-semibold text-indigo-200">Тариф PRO — 990 ₽/мес</h2>
-        <ul class="mt-3 space-y-2 text-sm text-slate-300">
-          <li>100 генераций в день вместо 5</li>
-          <li>Приоритетная ИИ-модель</li>
-          <li>Отмена в любой момент</li>
-        </ul>
-        <button id="upgradeBtn" class="mt-4 w-full rounded-xl bg-indigo-600 px-4 py-2.5 font-semibold text-white hover:bg-indigo-500">Оформить PRO</button>
+        <h2 class="font-semibold text-indigo-200">Увеличьте лимит</h2>
+        <div class="mt-3 space-y-3">
+          <div class="rounded-xl border border-white/10 bg-slate-950/40 p-3">
+            <div class="text-sm font-semibold">PRO — 299 ₽/мес</div>
+            <p class="mt-1 text-xs text-slate-400">100 генераций в день, приоритетная ИИ-модель</p>
+            <button id="upgradeBtn" class="mt-2 w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Оформить PRO</button>
+          </div>
+          <div class="rounded-xl border border-violet-500/30 bg-violet-500/10 p-3">
+            <div class="text-sm font-semibold">PRO+ — 990 ₽/мес</div>
+            <p class="mt-1 text-xs text-slate-400">300 генераций в день, все возможности PRO</p>
+            <button id="upgradeBtnPlus" class="mt-2 w-full rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-500">Оформить PRO+</button>
+          </div>
+        </div>
       </div>
 
       <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6">
@@ -108,8 +114,8 @@
     <div class="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6">
       <div class="flex items-start justify-between">
         <div>
-          <h2 class="text-xl font-bold">Оформление PRO</h2>
-          <p class="mt-1 text-sm text-slate-400">990 ₽ / 30 дней · 100 генераций в день</p>
+          <h2 id="payTitle" class="text-xl font-bold">Оформление PRO</h2>
+          <p id="paySubtitle" class="mt-1 text-sm text-slate-400">299 ₽ / 30 дней · 100 генераций в день</p>
         </div>
         <button id="payClose" class="text-2xl leading-none text-slate-400 hover:text-white" aria-label="Закрыть">&times;</button>
       </div>
@@ -132,7 +138,7 @@
           </div>
         </div>
         <p id="payError" class="hidden text-sm text-rose-400"></p>
-        <button id="payBtn" type="submit" class="w-full rounded-xl bg-indigo-600 px-4 py-2.5 font-semibold text-white hover:bg-indigo-500 disabled:opacity-60">Оплатить 990 ₽</button>
+        <button id="payBtn" type="submit" class="w-full rounded-xl bg-indigo-600 px-4 py-2.5 font-semibold text-white hover:bg-indigo-500 disabled:opacity-60">Оплатить 299 ₽</button>
       </form>
     </div>
   </div>

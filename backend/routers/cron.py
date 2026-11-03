@@ -19,6 +19,7 @@ from config import (
     FREE_DAILY_LIMIT,
     FRONTEND_URL,
     PRO_DAILY_LIMIT,
+    PRO_PLUS_DAILY_LIMIT,
     RESEND_API_KEY,
 )
 from emailer import send_email
@@ -46,12 +47,12 @@ def daily_report(x_cron_secret: str = Header(default="")):
         (now,),
     )
     expired_users = database.fetchall(
-        "SELECT id FROM users WHERE plan = 'pro' AND plan_expires_at IS NOT NULL AND plan_expires_at < %s",
+        "SELECT id FROM users WHERE plan IN ('pro', 'pro_plus') AND plan_expires_at IS NOT NULL AND plan_expires_at < %s",
         (now,),
     )
     database.execute(
         "UPDATE users SET plan = 'free', plan_expires_at = NULL "
-        "WHERE plan = 'pro' AND plan_expires_at IS NOT NULL AND plan_expires_at < %s",
+        "WHERE plan IN ('pro', 'pro_plus') AND plan_expires_at IS NOT NULL AND plan_expires_at < %s",
         (now,),
     )
 
@@ -70,12 +71,13 @@ def daily_report(x_cron_secret: str = Header(default="")):
     for email, plan, count in rows:
         if sent >= EMAIL_REPORT_MAX:
             break
-        limit = PRO_DAILY_LIMIT if plan == "pro" else FREE_DAILY_LIMIT
+        limit = PRO_PLUS_DAILY_LIMIT if plan == "pro_plus" else PRO_DAILY_LIMIT if plan == "pro" else FREE_DAILY_LIMIT
+        plan_title = "PRO+" if plan == "pro_plus" else "PRO" if plan == "pro" else "Free"
         body = (
             "<html><body style='font-family:Arial,sans-serif;color:#1e293b'>"
             f"<h2>Отчёт за {day_start.strftime('%d.%m.%Y')}</h2>"
             f"<p>Вчера вы создали <b>{count}</b> материал(ов) через AI Контент.</p>"
-            f"<p>Ваш тариф: <b>{'PRO' if plan == 'pro' else 'Free'}</b> (лимит {limit} генераций в день).</p>"
+            f"<p>Ваш тариф: <b>{plan_title}</b> (лимит {limit} генераций в день).</p>"
             f"<p><a href='{html_lib.escape(dashboard_link)}'>Открыть личный кабинет</a></p>"
             "<p style='color:#94a3b8;font-size:12px'>Вы получили это письмо, потому что зарегистрированы в AI Контент.</p>"
             "</body></html>"

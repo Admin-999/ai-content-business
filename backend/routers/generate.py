@@ -33,7 +33,7 @@ def generate(body: GenerateIn, user: dict = Depends(get_current_user)):
             status_code=429,
             detail=(
                 f"Достигнут дневной лимит: {used} из {limit} генераций. "
-                + ("Лимит обновится в 00:00 UTC — или оформите тариф PRO." if user["plan"] == "free" else "Лимит обновится в 00:00 UTC.")
+                + ("Лимит обновится в 00:00 UTC — или оформите тариф PRO или PRO+." if user["plan"] == "free" else "Лимит обновится в 00:00 UTC.")
             ),
         )
 

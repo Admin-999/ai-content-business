@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 import database
-from config import FREE_DAILY_LIMIT, PRO_DAILY_LIMIT
+from config import FREE_DAILY_LIMIT, PRO_DAILY_LIMIT, PRO_PLUS_DAILY_LIMIT
 from security import decode_token
 
 _bearer = HTTPBearer(auto_error=False)
@@ -33,8 +33,8 @@ def row_to_user(row) -> dict:
 
 
 def ensure_active_plan(user: dict) -> dict:
-    """Ленивое понижение тарифа: если подписка PRO истекла — возвращаем Free не дожидаясь cron."""
-    if user["plan"] == "pro" and user["plan_expires_at"] and user["plan_expires_at"] < utcnow():
+    """Ленивое понижение тарифа: если подписка PRO/PRO+ истекла — возвращаем Free не дожидаясь cron."""
+    if user["plan"] in ("pro", "pro_plus") and user["plan_expires_at"] and user["plan_expires_at"] < utcnow():
         database.execute(
             "UPDATE users SET plan = 'free', plan_expires_at = NULL WHERE id = %s",
             (user["id"],),
@@ -62,7 +62,11 @@ def get_current_user(creds: Optional[HTTPAuthorizationCredentials] = Depends(_be
 
 
 def daily_limit(plan: str) -> int:
-    return PRO_DAILY_LIMIT if plan == "pro" else FREE_DAILY_LIMIT
+    if plan == "pro":
+        return PRO_DAILY_LIMIT
+    if plan == "pro_plus":
+        return PRO_PLUS_DAILY_LIMIT
+    return FREE_DAILY_LIMIT
 
 
 def used_today(user_id: str) -> int:

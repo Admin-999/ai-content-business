@@ -22,13 +22,15 @@ function requireAuth() {
 
 function renderUsage(u) {
   const badge = $("planBadge");
-  badge.textContent = u.plan === "pro" ? "PRO" : "FREE";
+  badge.textContent = u.plan === "pro_plus" ? "PRO+" : u.plan === "pro" ? "PRO" : "FREE";
   badge.className =
-    u.plan === "pro"
-      ? "rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-xs font-semibold text-indigo-300"
-      : "rounded-full bg-slate-700 px-2.5 py-0.5 text-xs font-semibold text-slate-300";
+    u.plan === "pro_plus"
+      ? "rounded-full bg-violet-500/20 px-2.5 py-0.5 text-xs font-semibold text-violet-300"
+      : u.plan === "pro"
+        ? "rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-xs font-semibold text-indigo-300"
+        : "rounded-full bg-slate-700 px-2.5 py-0.5 text-xs font-semibold text-slate-300";
 
-  $("planName").textContent = u.plan === "pro" ? "Тариф PRO" : "Бесплатный тариф";
+  $("planName").textContent = u.plan === "pro_plus" ? "Тариф PRO+" : u.plan === "pro" ? "Тариф PRO" : "Бесплатный тариф";
 
   const pct = u.limit ? Math.min(100, Math.round((u.used_today / u.limit) * 100)) : 0;
   const bar = $("usageBar");
@@ -38,7 +40,7 @@ function renderUsage(u) {
   $("usageText").textContent = `Сегодня: ${u.used_today} из ${u.limit} генераций (осталось ${u.remaining})`;
   $("usageTotal").textContent = `Всего создано материалов: ${u.total_generated}`;
 
-  $("upgradeCard").classList.toggle("hidden", u.plan === "pro");
+  $("upgradeCard").classList.toggle("hidden", u.plan !== "free");
 }
 
 async function loadUsage() {
@@ -127,7 +129,18 @@ async function generate(e) {
 }
 
 // --- Модалка оплаты (заглушка под Stripe) ---
-function openPay() {
+const PAY_PLANS = {
+  pro: { title: "Оформление PRO", subtitle: "299 ₽ / 30 дней · 100 генераций в день", button: "Оплатить 299 ₽" },
+  pro_plus: { title: "Оформление PRO+", subtitle: "990 ₽ / 30 дней · 300 генераций в день", button: "Оплатить 990 ₽" },
+};
+
+let payPlan = "pro";
+
+function openPay(plan) {
+  payPlan = PAY_PLANS[plan] ? plan : "pro";
+  $("payTitle").textContent = PAY_PLANS[payPlan].title;
+  $("paySubtitle").textContent = PAY_PLANS[payPlan].subtitle;
+  $("payBtn").textContent = PAY_PLANS[payPlan].button;
   $("payModal").classList.remove("hidden");
   $("payModal").classList.add("flex");
 }
@@ -154,7 +167,7 @@ async function pay(e) {
   try {
     const data = await api("/api/subscribe", {
       method: "POST",
-      body: { plan: "pro", card_number: num, card_exp: exp, card_cvc: cvc },
+      body: { plan: payPlan, card_number: num, card_exp: exp, card_cvc: cvc },
     });
     closePay();
     toast(data.message, "success");
@@ -163,7 +176,7 @@ async function pay(e) {
     showPayError(err.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = "Оплатить 990 ₽";
+    btn.textContent = PAY_PLANS[payPlan].button;
   }
 }
 
@@ -188,7 +201,8 @@ function showPayError(msg) {
     const ok = await copyText($("resultText").textContent);
     toast(ok ? "Скопировано в буфер обмена" : "Не удалось скопировать", ok ? "success" : "error");
   });
-  $("upgradeBtn").addEventListener("click", openPay);
+  $("upgradeBtn").addEventListener("click", () => openPay("pro"));
+  $("upgradeBtnPlus").addEventListener("click", () => openPay("pro_plus"));
   $("payClose").addEventListener("click", closePay);
   $("payModal").addEventListener("click", (e) => { if (e.target === $("payModal")) closePay(); });
   $("payForm").addEventListener("submit", pay);
@@ -209,7 +223,7 @@ function showPayError(msg) {
 
   // Открытие модалки оплаты по прямой ссылке dashboard.html#upgrade (с лендинга)
   if (location.hash === "#upgrade") {
-    openPay();
+    openPay("pro");
     history.replaceState(null, "", location.pathname);
   }
 })();
