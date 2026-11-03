@@ -122,11 +122,10 @@
       <!-- Вкладка: Telegram-каналы -->
       <div id="tab-channels" class="autotab-pane mt-5 hidden">
         <details class="rounded-xl border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
-          <summary class="cursor-pointer font-medium">Как это работает? 3 простых шага</summary>
+          <summary class="cursor-pointer font-medium">Как это работает? 2 простых шага</summary>
           <ol class="mt-2 list-decimal space-y-1 pl-5 text-slate-400">
-            <li>В Telegram напишите <span class="font-mono text-slate-300">@BotFather</span> команду <span class="font-mono text-slate-300">/newbot</span> и скопируйте токен вида <span class="font-mono text-slate-300">123456789:AA…</span></li>
-            <li>Добавьте этого бота администратором своего канала: настройки канала → Администраторы → Добавить администратора.</li>
-            <li>Заполните форму ниже — ИИ сам будет публиковать посты по расписанию.</li>
+            <li>Добавьте бота <span class="font-mono text-slate-300 service-bot-name">нашего бота</span> администратором своего канала: настройки канала → Администраторы → Добавить администратора (с правом публикации сообщений).</li>
+            <li>Заполните форму ниже — ИИ сам будет писать и публиковать посты по расписанию. Токены и пароли не нужны.</li>
           </ol>
         </details>
 
@@ -143,11 +142,7 @@
             <label for="chDesc" class="mb-1 block text-sm font-medium text-slate-300">О чём канал и что публиковать</label>
             <textarea id="chDesc" class="field" rows="3" maxlength="2000" placeholder="Например: пекарня в Казани. Публикуем новинки, акции, фото свежей выпечки, отзывы клиентов"></textarea>
           </div>
-          <div>
-            <label for="chToken" class="mb-1 block text-sm font-medium text-slate-300">Токен бота (от @BotFather)</label>
-            <input id="chToken" class="field" maxlength="100" autocomplete="off" placeholder="123456789:AA...">
-          </div>
-          <div class="grid grid-cols-2 gap-4">
+          <div class="md:col-span-2 grid grid-cols-2 gap-4">
             <div>
               <label for="chTone" class="mb-1 block text-sm font-medium text-slate-300">Тон постов</label>
               <select id="chTone" class="field">

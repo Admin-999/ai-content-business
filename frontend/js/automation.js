@@ -146,21 +146,19 @@ async function apiForm(path, formData) {
     const body = {
       title: $("chTitle").value.trim(),
       description: $("chDesc").value.trim(),
-      bot_token: $("chToken").value.trim(),
       channel_username: $("chUsername").value.trim(),
       tone: $("chTone").value,
       interval_hours: parseInt($("chInterval").value, 10),
     };
     if (body.title.length < 2) return toast("Введите название канала.", "error");
     if (body.description.length < 10) return toast("Опишите канал подробнее: минимум 10 символов.", "error");
-    if (!body.bot_token) return toast("Вставьте токен бота, полученный у @BotFather.", "error");
     if (!body.channel_username) return toast("Укажите адрес канала, например @my_shop.", "error");
     const btn = $("chBtn");
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>Проверяем бота и канал…';
     try {
       const data = await api("/api/channels", { method: "POST", body });
-      toast("Канал подключён! Бот @" + data.bot_username + " начнёт публиковать посты по расписанию.", "success");
+      toast("Канал подключён! ИИ начнёт публиковать посты по расписанию.", "success");
       $("channelForm").reset();
       loadChannels();
     } catch (err) {
@@ -188,6 +186,14 @@ async function apiForm(path, formData) {
       toast(err.message, "error");
     }
   });
+
+  async function loadChannelSetup() {
+    try {
+      const data = await api("/api/channels/setup");
+      const name = data.bot_username ? "@" + data.bot_username : "нашего бота";
+      document.querySelectorAll(".service-bot-name").forEach((el) => { el.textContent = name; });
+    } catch (err) { /* имя бота не критично для работы */ }
+  }
 
   // ===== Wildberries =====
   async function loadWbAccount() {
@@ -491,6 +497,7 @@ async function apiForm(path, formData) {
   });
 
   // ===== Старт =====
+  loadChannelSetup();
   loadChannels();
   loadWbAccount();
   loadWbCards();

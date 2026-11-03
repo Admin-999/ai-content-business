@@ -1,7 +1,8 @@
 """Автопостинг в Telegram-каналы.
 
-Клиент один раз описывает канал и даёт токен бота из @BotFather
-(бот должен быть администратором канала). Cron-задача /api/cron/autopost
+Клиент описывает канал и добавляет бота сервиса администратором канала —
+никаких токенов клиенту не нужно. Публикация идёт от единственного бота
+сервиса (TELEGRAM_BOT_TOKEN в секретах). Cron-задача /api/cron/autopost
 (см. .github/workflows/autopost.yml) сама пишет посты через ИИ
 с учётом интервала канала и дневного лимита пользователя.
 """
@@ -13,7 +14,7 @@ from pydantic import BaseModel, Field
 import database
 import tgapi
 from ai import AIError, generate_content
-from config import CRON_SECRET
+from config import CRON_SECRET, TELEGRAM_BOT_TOKEN
 from deps import daily_limit, get_current_user, new_id, used_today, utcnow
 
 logger = logging.getLogger("app.channels")
@@ -28,7 +29,6 @@ _CHANNEL_COLS = (
 class ChannelIn(BaseModel):
     title: str = Field(min_length=2, max_length=100)
     description: str = Field(min_length=10, max_length=2000)
-    bot_token: str = Field(min_length=20, max_length=100)
     channel_username: str = Field(min_length=2, max_length=100)
     tone: str = Field(default="дружелюбный", max_length=50)
     interval_hours: int = 12
@@ -66,6 +66,18 @@ def _log_post(channel_id: str, user_id: str, text: str, status: str, error) -> N
     )
 
 
+@router.get("/channels/setup")
+def channel_setup(user: dict = Depends(get_current_user)):
+    """Имя бота сервиса для инструкции «добавьте администратором»."""
+    if not TELEGRAM_BOT_TOKEN:
+        return {"ready": False, "bot_username": None}
+    try:
+        me = tgapi.get_me(TELEGRAM_BOT_TOKEN)
+        return {"ready": True, "bot_username": me.get("username")}
+    except tgapi.TelegramError:
+        return {"ready": False, "bot_username": None}
+
+
 @router.post("/channels")
 def create_channel(body: ChannelIn, user: dict = Depends(get_current_user)):
     username = _norm_channel(body.channel_username)
@@ -76,22 +88,25 @@ def create_channel(body: ChannelIn, user: dict = Depends(get_current_user)):
         )
     if body.interval_hours not in (6, 12, 24):
         raise HTTPException(status_code=422, detail="Интервал постинга: 6, 12 или 24 часа.")
+    if not TELEGRAM_BOT_TOKEN:
+        raise HTTPException(
+            status_code=503,
+            detail="Автопостинг подключается: администратор сервиса регистрирует бота. Попробуйте чуть позже.",
+        )
 
     try:
-        me = tgapi.get_me(body.bot_token.strip())
+        me = tgapi.get_me(TELEGRAM_BOT_TOKEN)
     except tgapi.TelegramError as e:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Токен бота не подошёл: {e}. Создайте бота у @BotFather и скопируйте токен.",
-        )
+        raise HTTPException(status_code=502, detail=f"Бот сервиса недоступен: {e}")
+    bot_username = me.get("username") or "бота сервиса"
     try:
-        tgapi.get_chat(body.bot_token.strip(), f"@{username}")
+        tgapi.get_chat(TELEGRAM_BOT_TOKEN, f"@{username}")
     except tgapi.TelegramError as e:
         raise HTTPException(
             status_code=422,
             detail=(
-                f"Канал @{username} недоступен ({e}). "
-                f"Добавьте бота @{me.get('username', 'бота')} администратором канала с правом публикации."
+                f"Нет доступа к каналу @{username} ({e}). Откройте канал → Администраторы → "
+                f"добавьте бота @{bot_username} администратором с правом публикации — и нажмите кнопку ещё раз."
             ),
         )
 
@@ -99,20 +114,19 @@ def create_channel(body: ChannelIn, user: dict = Depends(get_current_user)):
     database.execute(
         "INSERT INTO channels (id, user_id, title, description, bot_token, channel_username, "
         "tone, interval_hours, active, last_post_at, created_at) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, NULL, %s)",
+        "VALUES (%s, %s, %s, %s, '', %s, %s, %s, 1, NULL, %s)",
         (
             cid,
             user["id"],
             body.title.strip(),
             body.description.strip(),
-            body.bot_token.strip(),
             username,
             body.tone,
             body.interval_hours,
             utcnow(),
         ),
     )
-    return {"id": cid, "bot_username": me.get("username"), "status": "created"}
+    return {"id": cid, "bot_username": bot_username, "status": "created"}
 
 
 @router.get("/channels")
@@ -190,15 +204,17 @@ def autopost(x_cron_secret: str = Header(default="")):
     """Запускается GitHub Actions каждые 2 часа. Пишет посты в активные каналы."""
     if not CRON_SECRET or x_cron_secret != CRON_SECRET:
         raise HTTPException(status_code=403, detail="Недействительный секрет cron-задачи.")
+    if not TELEGRAM_BOT_TOKEN:
+        return {"status": "ok", "checked": 0, "sent": 0, "failed": 0, "skipped": 0}
 
     now = utcnow()
     rows = database.fetchall(
         "SELECT c.id, c.user_id, c.title, c.description, c.tone, c.interval_hours, "
-        "c.bot_token, c.channel_username, c.last_post_at, u.plan "
+        "c.channel_username, c.last_post_at, u.plan "
         "FROM channels c JOIN users u ON u.id = c.user_id WHERE c.active = 1"
     )
     sent = failed = skipped = 0
-    for cid, uid, title, description, tone, interval_hours, token, username, last_post_at, plan in rows:
+    for cid, uid, title, description, tone, interval_hours, username, last_post_at, plan in rows:
         last = database.as_dt(last_post_at)
         if last and (now - last).total_seconds() < interval_hours * 3600 - 600:
             skipped += 1
@@ -218,7 +234,7 @@ def autopost(x_cron_secret: str = Header(default="")):
             failed += 1
             continue
         try:
-            tgapi.send_message(token, f"@{username}", text)
+            tgapi.send_message(TELEGRAM_BOT_TOKEN, f"@{username}", text)
             status, error = "sent", None
             database.execute("UPDATE channels SET last_post_at = %s WHERE id = %s", (now, cid))
             sent += 1
