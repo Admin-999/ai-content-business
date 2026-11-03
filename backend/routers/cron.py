@@ -32,22 +32,6 @@ def _check_secret(x_cron_secret: str) -> None:
         raise HTTPException(status_code=403, detail="Недействительный секрет cron-задачи.")
 
 
-@router.post("/groq-models")
-def groq_models(x_cron_secret: str = Header(default="")):
-    """ВРЕМЕННЫЙ отладочный эндпоинт: список моделей Groq (для выбора vision-модели)."""
-    import httpx
-
-    from config import GROQ_API_KEY
-
-    _check_secret(x_cron_secret)
-    resp = httpx.get(
-        "https://api.groq.com/openai/v1/models",
-        headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-        timeout=30.0,
-    )
-    return {"status": resp.status_code, "body": resp.text[:8000]}
-
-
 @router.post("/daily-report")
 def daily_report(x_cron_secret: str = Header(default="")):
     _check_secret(x_cron_secret)
