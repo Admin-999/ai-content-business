@@ -16,7 +16,9 @@ jobs:
         run: |
           set -e
           echo "=== 0. Список моделей Groq (через backend) ==="
-          curl -s --max-time 60 -X POST "$BACKEND_URL/api/cron/groq-models" -H "X-Cron-Secret: $CRON_SECRET" | head -c 6000; echo
+          C0=$(curl -s --max-time 90 -o /tmp/models.json -w "%{http_code}" -X POST "$BACKEND_URL/api/cron/groq-models" -H "X-Cron-Secret: $CRON_SECRET") || true
+          echo "HTTP $C0"
+          head -c 6000 /tmp/models.json || true; echo
           B="$BACKEND_URL"
           echo "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAeklEQVR4nO3PUQkAIBTAQBMZ1FfaEH4cwmABbmvP+brFBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQwHjEy8AF+uQxLRARc80AAAAASUVORK5CYII=" | base64 -d > /tmp/item.png
 
