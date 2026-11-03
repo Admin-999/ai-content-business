@@ -100,13 +100,18 @@ def create_channel(body: ChannelIn, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=502, detail=f"Бот сервиса недоступен: {e}")
     bot_username = me.get("username") or "бота сервиса"
     try:
-        tgapi.get_chat(TELEGRAM_BOT_TOKEN, f"@{username}")
+        member = tgapi.get_chat_member(TELEGRAM_BOT_TOKEN, f"@{username}", me.get("id"))
+        status = member.get("status")
     except tgapi.TelegramError as e:
+        status = None
+        logger.info("getChatMember @%s: %s", username, e)
+    if status not in ("administrator", "creator"):
         raise HTTPException(
             status_code=422,
             detail=(
-                f"Нет доступа к каналу @{username} ({e}). Откройте канал → Администраторы → "
-                f"добавьте бота @{bot_username} администратором с правом публикации — и нажмите кнопку ещё раз."
+                f"Бот сервиса ещё не администратор канала @{username}. "
+                f"Откройте канал → Администраторы → добавьте @{bot_username} администратором "
+                "с правом публикации сообщений — и нажмите кнопку ещё раз."
             ),
         )
 

@@ -38,6 +38,11 @@ def get_chat(token: str, chat_id: str):
     return _call(token, "getChat", {"chat_id": chat_id})
 
 
+def get_chat_member(token: str, chat_id: str, user_id: int):
+    """Статус участника чата: creator / administrator / member / left / kicked."""
+    return _call(token, "getChatMember", {"chat_id": chat_id, "user_id": user_id})
+
+
 def send_message(token: str, chat_id: str, text: str):
     return _call(
         token,
