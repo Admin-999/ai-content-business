@@ -111,36 +111,61 @@
     <!-- Автоматизация: Telegram-каналы, Wildberries, ИИ-боты -->
     <section id="automation" class="rounded-2xl border border-white/10 bg-slate-900/60 p-6 lg:col-span-5">
       <h2 class="text-2xl font-bold">Автоматизация</h2>
-      <p class="mt-1 text-sm text-slate-400">Подключите Telegram-канал, магазин Wildberries или соберите ИИ-бота — дальше всё работает само.</p>
+      <p class="mt-1 text-sm text-slate-400">Подключите Telegram-канал или Instagram, магазин Wildberries или соберите ИИ-бота — дальше всё работает само.</p>
 
       <div class="mt-4 flex flex-wrap gap-2">
-        <button type="button" data-tab="channels" class="autotab rounded-lg px-4 py-2 text-sm font-semibold">Telegram-каналы</button>
+        <button type="button" data-tab="channels" class="autotab rounded-lg px-4 py-2 text-sm font-semibold">Каналы и Instagram</button>
         <button type="button" data-tab="wb" class="autotab rounded-lg px-4 py-2 text-sm font-semibold">Wildberries</button>
         <button type="button" data-tab="bots" class="autotab rounded-lg px-4 py-2 text-sm font-semibold">ИИ-боты</button>
       </div>
 
-      <!-- Вкладка: Telegram-каналы -->
+      <!-- Вкладка: Telegram-каналы и Instagram -->
       <div id="tab-channels" class="autotab-pane mt-5 hidden">
-        <details class="rounded-xl border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
-          <summary class="cursor-pointer font-medium">Как это работает? 2 простых шага</summary>
-          <ol class="mt-2 list-decimal space-y-1 pl-5 text-slate-400">
-            <li>Добавьте бота <span class="font-mono text-slate-300 service-bot-name">нашего бота</span> администратором своего канала: настройки канала → Администраторы → Добавить администратора (с правом публикации сообщений).</li>
-            <li>Заполните форму ниже — ИИ сам будет писать и публиковать посты по расписанию. Токены и пароли не нужны.</li>
-          </ol>
-        </details>
+        <div id="tgSetupHint" class="rounded-xl border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
+          <details>
+            <summary class="cursor-pointer font-medium">Как это работает? 2 простых шага</summary>
+            <ol class="mt-2 list-decimal space-y-1 pl-5 text-slate-400">
+              <li>Добавьте бота <span class="font-mono text-slate-300 service-bot-name">нашего бота</span> администратором своего канала: настройки канала → Администраторы → Добавить администратора (с правом публикации сообщений).</li>
+              <li>Заполните форму ниже — ИИ сам будет писать и публиковать посты по расписанию. Токены и пароли не нужны.</li>
+            </ol>
+          </details>
+        </div>
+
+        <div id="igSetupHint" class="hidden rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/10 p-3 text-sm text-fuchsia-100">
+          Нужен одноразовый токен из кабинета Meta (живёт ~1 час) и App Secret.
+          <a href="instagram-setup.html" target="_blank" class="font-semibold text-fuchsia-300 underline hover:text-fuchsia-200">Пошаговая инструкция →</a>
+        </div>
 
         <form id="channelForm" class="mt-4 grid gap-4 md:grid-cols-2">
-          <div>
-            <label for="chTitle" class="mb-1 block text-sm font-medium text-slate-300">Название канала</label>
-            <input id="chTitle" class="field" maxlength="100" placeholder="Пекарня «Тёплый хлеб»">
+          <div class="md:col-span-2">
+            <span class="mb-1 block text-sm font-medium text-slate-300">Куда публиковать</span>
+            <div id="platformChips" class="flex flex-wrap gap-2">
+              <button type="button" class="chip active" data-v="telegram">Telegram-канал</button>
+              <button type="button" class="chip" data-v="instagram">Instagram</button>
+            </div>
+            <input type="hidden" id="chPlatform" value="telegram">
           </div>
           <div>
+            <label for="chTitle" class="mb-1 block text-sm font-medium text-slate-300">Название</label>
+            <input id="chTitle" class="field" maxlength="100" placeholder="Пекарня «Тёплый хлеб»">
+          </div>
+          <div id="tgUsernameField">
             <label for="chUsername" class="mb-1 block text-sm font-medium text-slate-300">Адрес канала</label>
             <input id="chUsername" class="field" maxlength="100" placeholder="@my_shop или https://t.me/my_shop">
           </div>
           <div class="md:col-span-2">
             <label for="chDesc" class="mb-1 block text-sm font-medium text-slate-300">О чём канал и что публиковать</label>
             <textarea id="chDesc" class="field" rows="3" maxlength="2000" placeholder="Например: пекарня в Казани. Публикуем новинки, акции, фото свежей выпечки, отзывы клиентов"></textarea>
+          </div>
+          <div id="igFields" class="md:col-span-2 hidden space-y-3 rounded-xl border border-white/10 bg-slate-950/40 p-4">
+            <div>
+              <label for="chIgToken" class="mb-1 block text-sm font-medium text-slate-300">Токен Instagram (из кабинета Meta)</label>
+              <textarea id="chIgToken" class="field font-mono text-xs" rows="3" maxlength="600" autocomplete="off" placeholder="IGAAK…"></textarea>
+            </div>
+            <div>
+              <label for="chIgSecret" class="mb-1 block text-sm font-medium text-slate-300">App Secret приложения Meta</label>
+              <input id="chIgSecret" type="password" class="field" maxlength="128" autocomplete="off" placeholder="32 символа из настроек приложения">
+            </div>
           </div>
           <div class="md:col-span-2 grid grid-cols-2 gap-4">
             <div>
@@ -162,7 +187,7 @@
             </div>
           </div>
           <div class="md:col-span-2">
-            <button id="chBtn" type="submit" class="rounded-xl bg-indigo-600 px-4 py-2.5 font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60">Подключить канал</button>
+            <button id="chBtn" type="submit" class="rounded-xl bg-indigo-600 px-4 py-2.5 font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60">Подключить</button>
             <p class="mt-2 text-xs text-slate-500">Каждый автопост списывается из дневного лимита генераций вашего тарифа.</p>
           </div>
         </form>

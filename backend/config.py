@@ -64,6 +64,8 @@ PRO_PERIOD_DAYS = _get_int("PRO_PERIOD_DAYS", 30)
 # --- Автоматизация: Telegram и Wildberries ---
 # Токен единственного бота сервиса: им клиенты добавляют администратором канала
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+# Папка для PNG-карточек автопостинга Instagram (в Modal — постоянный том /data)
+IG_CARDS_DIR = os.getenv("IG_CARDS_DIR", "/data/ig_cards" if os.path.isdir("/data") else "./ig_cards")
 # Публичный адрес этого backend, по нему Telegram шлёт обновления ИИ-ботов
 BACKEND_URL = os.getenv(
     "BACKEND_URL", "https://vsvolodin2014--ai-content-api-api.us-east.modal.run"

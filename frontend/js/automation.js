@@ -1,4 +1,4 @@
-// Раздел «Автоматизация»: Telegram-каналы, Wildberries, ИИ-боты.
+// Раздел «Автоматизация»: каналы (Telegram, Instagram), Wildberries, ИИ-боты.
 // Использует api()/toast()/copyText()/$/fmtDate/loadUsage из api.js и dashboard.js.
 
 // Отправка формы с файлом (FormData, без Content-Type: application/json)
@@ -37,10 +37,24 @@ async function apiForm(path, formData) {
   tabBtns.forEach((b) => b.addEventListener("click", () => openTab(b.dataset.tab)));
   openTab("channels");
 
-  // ===== Telegram-каналы =====
+  // ===== Каналы: Telegram и Instagram =====
   const INTERVAL_NAMES = { 6: "каждые 6 часов", 12: "каждые 12 часов", 24: "раз в день" };
 
+  const platformChips = Array.from(document.querySelectorAll("#platformChips .chip"));
+
+  function selectPlatform(name) {
+    platformChips.forEach((c) => c.classList.toggle("active", c.dataset.v === name));
+    $("chPlatform").value = name;
+    const isIg = name === "instagram";
+    $("igFields").classList.toggle("hidden", !isIg);
+    $("tgUsernameField").classList.toggle("hidden", isIg);
+    $("igSetupHint").classList.toggle("hidden", !isIg);
+    $("tgSetupHint").classList.toggle("hidden", isIg);
+  }
+  platformChips.forEach((chip) => chip.addEventListener("click", () => selectPlatform(chip.dataset.v)));
+
   function channelCard(ch) {
+    const isIg = ch.platform === "instagram";
     const card = document.createElement("div");
     card.className = "rounded-xl border border-white/10 bg-slate-950/60 p-4";
 
@@ -49,17 +63,22 @@ async function apiForm(path, formData) {
     const title = document.createElement("span");
     title.className = "font-semibold";
     title.textContent = ch.title;
+    const plat = document.createElement("span");
+    plat.className = isIg
+      ? "rounded-full bg-fuchsia-500/15 px-2.5 py-0.5 text-xs font-semibold text-fuchsia-300"
+      : "rounded-full bg-sky-500/15 px-2.5 py-0.5 text-xs font-semibold text-sky-300";
+    plat.textContent = isIg ? "Instagram" : "Telegram";
     const badge = document.createElement("span");
     badge.className = ch.active
       ? "rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-300"
       : "rounded-full bg-slate-700 px-2.5 py-0.5 text-xs font-semibold text-slate-300";
     badge.textContent = ch.active ? "Работает" : "Пауза";
-    head.append(title, badge);
+    head.append(title, plat, badge);
 
     const meta = document.createElement("p");
     meta.className = "mt-1 text-xs text-slate-400";
     meta.textContent =
-      "@" + ch.channel_username +
+      (isIg ? "@" + (ch.ig_username || "instagram") : "@" + ch.channel_username) +
       " · тон: " + ch.tone +
       " · " + (INTERVAL_NAMES[ch.interval_hours] || "каждые " + ch.interval_hours + " ч") +
       " · опубликовано: " + ch.posts_sent + " из " + ch.posts_total +
@@ -78,6 +97,20 @@ async function apiForm(path, formData) {
     deleteBtn.dataset.action = "delete";
     deleteBtn.dataset.id = ch.id;
     actions.append(toggleBtn, deleteBtn);
+
+    card.append(head, meta, actions);
+
+    if (isIg && ch.token_expires_at) {
+      const days = Math.ceil((new Date(ch.token_expires_at) - Date.now()) / 86400000);
+      if (days < 10) {
+        const warn = document.createElement("p");
+        warn.className = "mt-2 text-xs " + (days < 3 ? "text-rose-400" : "text-amber-400");
+        warn.textContent = days < 0
+          ? "Токен Instagram истёк — подключите аккаунт заново (см. инструкцию в форме выше)."
+          : "Токен Instagram истекает через " + days + " дн. — обычно он продлевается сам. Если посты перестанут выходить, подключите аккаунт заново.";
+        card.appendChild(warn);
+      }
+    }
 
     const det = document.createElement("details");
     det.className = "mt-3";
@@ -131,7 +164,7 @@ async function apiForm(path, formData) {
       if (!data.channels.length) {
         const p = document.createElement("p");
         p.className = "text-sm text-slate-400";
-        p.textContent = "Пока нет каналов. Заполните форму выше — и ИИ начнёт публиковать посты сам.";
+        p.textContent = "Пока нет каналов. Выберите Telegram или Instagram в форме выше — и ИИ начнёт публиковать посты сам.";
         list.appendChild(p);
         return;
       }
@@ -143,29 +176,56 @@ async function apiForm(path, formData) {
 
   $("channelForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const body = {
-      title: $("chTitle").value.trim(),
-      description: $("chDesc").value.trim(),
-      channel_username: $("chUsername").value.trim(),
-      tone: $("chTone").value,
-      interval_hours: parseInt($("chInterval").value, 10),
-    };
-    if (body.title.length < 2) return toast("Введите название канала.", "error");
-    if (body.description.length < 10) return toast("Опишите канал подробнее: минимум 10 символов.", "error");
-    if (!body.channel_username) return toast("Укажите адрес канала, например @my_shop.", "error");
+    const platform = $("chPlatform").value;
+    const title = $("chTitle").value.trim();
+    const description = $("chDesc").value.trim();
+    if (title.length < 2) return toast("Введите название канала.", "error");
+    if (description.length < 10) return toast("Опишите канал подробнее: минимум 10 символов.", "error");
     const btn = $("chBtn");
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>Проверяем бота и канал…';
     try {
-      const data = await api("/api/channels", { method: "POST", body });
-      toast("Канал подключён! ИИ начнёт публиковать посты по расписанию.", "success");
+      if (platform === "instagram") {
+        const access_token = $("chIgToken").value.trim();
+        const app_secret = $("chIgSecret").value.trim();
+        if (access_token.length < 20) return toast("Вставьте токен из кабинета Meta — пошаговая инструкция в подсказке над формой.", "error");
+        if (!app_secret) return toast("Вставьте App Secret из настроек приложения Meta (Настройки приложения → Basic).", "error");
+        btn.innerHTML = '<span class="spinner"></span>Подключаем Instagram…';
+        await api("/api/channels/instagram", {
+          method: "POST",
+          body: {
+            title,
+            description,
+            tone: $("chTone").value,
+            interval_hours: parseInt($("chInterval").value, 10),
+            access_token,
+            app_secret,
+          },
+        });
+        toast("Instagram подключён! ИИ начнёт публиковать посты-карточки по расписанию.", "success");
+      } else {
+        const channel_username = $("chUsername").value.trim();
+        if (!channel_username) return toast("Укажите адрес канала, например @my_shop.", "error");
+        btn.innerHTML = '<span class="spinner"></span>Проверяем бота и канал…';
+        await api("/api/channels", {
+          method: "POST",
+          body: {
+            title,
+            description,
+            channel_username,
+            tone: $("chTone").value,
+            interval_hours: parseInt($("chInterval").value, 10),
+          },
+        });
+        toast("Канал подключён! ИИ начнёт публиковать посты по расписанию.", "success");
+      }
       $("channelForm").reset();
+      selectPlatform("telegram");
       loadChannels();
     } catch (err) {
       toast(err.message, "error");
     } finally {
       btn.disabled = false;
-      btn.textContent = "Подключить канал";
+      btn.textContent = "Подключить";
     }
   });
 

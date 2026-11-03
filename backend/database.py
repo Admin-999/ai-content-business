@@ -61,7 +61,12 @@ DDL = [
         interval_hours INTEGER NOT NULL DEFAULT 12,
         active INTEGER NOT NULL DEFAULT 1,
         last_post_at TIMESTAMPTZ,
-        created_at TIMESTAMPTZ NOT NULL
+        created_at TIMESTAMPTZ NOT NULL,
+        platform TEXT NOT NULL DEFAULT 'telegram',
+        access_token TEXT,
+        ig_user_id TEXT,
+        ig_username TEXT,
+        token_expires_at TIMESTAMPTZ
     )""",
     "CREATE INDEX IF NOT EXISTS idx_channels_active ON channels (active)",
     """CREATE TABLE IF NOT EXISTS channel_posts (
@@ -197,8 +202,35 @@ def as_dt(value):
         return None
 
 
+# Колонки Instagram в таблице channels: добавляются миграцией к старым базам
+_IG_COLUMNS = (
+    ("platform", "TEXT NOT NULL DEFAULT 'telegram'"),
+    ("access_token", "TEXT"),
+    ("ig_user_id", "TEXT"),
+    ("ig_username", "TEXT"),
+    ("token_expires_at", "TIMESTAMPTZ"),
+)
+
+
+def _migrate_channels() -> None:
+    """Дополняет таблицу channels, созданную до появления автопостинга Instagram."""
+    if is_postgres():
+        rows = fetchall(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'channels'"
+        )
+        present = {r[0] for r in rows}
+    else:
+        with _lock:
+            present = {r[1] for r in _sqlite.execute("PRAGMA table_info(channels)").fetchall()}
+    for name, col_type in _IG_COLUMNS:
+        if name not in present:
+            execute(f"ALTER TABLE channels ADD COLUMN {name} {col_type}")
+            logger.info("Миграция channels: добавлена колонка %s", name)
+
+
 def init_db() -> None:
     """Таблицы создаются автоматически при старте — sql/schema.sql нужен только для ручной инициализации."""
     for ddl in DDL:
         execute(ddl)
+    _migrate_channels()
     logger.info("База данных готова")

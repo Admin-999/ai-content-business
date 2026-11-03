@@ -18,6 +18,7 @@ volume = modal.Volume.from_name("ai-content-db", create_if_missing=True)
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
+    .apt_install("fonts-dejavu-core")
     .pip_install_from_requirements("requirements.txt")
     .add_local_python_source(
         "main",
@@ -27,6 +28,8 @@ image = (
         "deps",
         "ai",
         "tgapi",
+        "igapi",
+        "igcards",
         "emailer",
         "routers",
     )
