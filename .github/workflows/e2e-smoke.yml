@@ -11,14 +11,12 @@ jobs:
         shell: bash
         env:
           BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           set -e
-          echo "=== 0. Список моделей Groq ==="
-          curl -s --max-time 30 https://api.groq.com/openai/v1/models \
-            -H "Authorization: Bearer $GROQ_API_KEY" -o /tmp/models.json
-          cat /tmp/models.json | head -c 3000; echo
-          jq -r '.data[].id' /tmp/models.json | sort || true
+          echo "=== 0. Список моделей Groq (через backend) ==="
+          curl -s --max-time 60 -X POST "$BACKEND_URL/api/cron/groq-models" -H "X-Cron-Secret: $CRON_SECRET" | head -c 6000; echo
           B="$BACKEND_URL"
           echo "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAeklEQVR4nO3PUQkAIBTAQBMZ1FfaEH4cwmABbmvP+brFBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQwHjEy8AF+uQxLRARc80AAAAASUVORK5CYII=" | base64 -d > /tmp/item.png
 
