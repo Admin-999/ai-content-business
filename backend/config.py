@@ -66,7 +66,7 @@ PRO_PERIOD_DAYS = _get_int("PRO_PERIOD_DAYS", 30)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 # Публичный адрес этого backend, по нему Telegram шлёт обновления ИИ-ботов
 BACKEND_URL = os.getenv(
-    "BACKEND_URL", "https://vsvolodin2014--ai-content-api-api.us-east-1.modal.run"
+    "BACKEND_URL", "https://vsvolodin2014--ai-content-api-api.us-east.modal.run"
 ).rstrip("/")
 # Модель с распознаванием изображений (фото товаров Wildberries)
 GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "qwen/qwen3.8-27b")
