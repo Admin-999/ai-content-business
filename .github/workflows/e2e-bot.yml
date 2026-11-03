@@ -1,0 +1,45 @@
+name: E2E service bot (временный)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Проверить бота сервиса через живой API
+        shell: bash
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -e
+          B="$BACKEND_URL"
+
+          echo "=== 1. Регистрация ==="
+          REG=$(curl -s --max-time 120 -X POST "$B/api/auth/register" -H "Content-Type: application/json" \
+            -d "{\"email\":\"svcbot$(date +%s)@test.local\",\"password\":\"test12345\"}")
+          TOKEN=$(echo "$REG" | jq -r .token)
+          test "$TOKEN" != "null" && test -n "$TOKEN"
+
+          echo "=== 2. Бот сервиса (setup) ==="
+          S=$(curl -s --max-time 60 "$B/api/channels/setup" -H "Authorization: Bearer $TOKEN")
+          echo "$S"
+          test "$(echo "$S" | jq -r .ready)" = "true"
+          BOT=$(echo "$S" | jq -r .bot_username)
+          test -n "$BOT" && test "$BOT" != "null"
+
+          echo "=== 3. Канал, где бот не админ -> 422 с именем бота ==="
+          C=$(curl -s --max-time 60 -o /tmp/r1.json -w "%{http_code}" -X POST "$B/api/channels" \
+            -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+            -d '{"title":"Тест канал","description":"Канал о выпечке и кофе для теста","channel_username":"@telegram","tone":"дружелюбный","interval_hours":12}')
+          echo "$C $(cat /tmp/r1.json)"
+          test "$C" = "422"
+          grep -q "$BOT" /tmp/r1.json
+
+          echo "=== 4. Autopost по секрету -> 200 ==="
+          C2=$(curl -s --max-time 120 -o /tmp/r2.json -w "%{http_code}" -X POST "$B/api/cron/autopost" -H "X-Cron-Secret: $CRON_SECRET")
+          echo "$C2 $(cat /tmp/r2.json)"
+          test "$C2" = "200"
+
+          echo "ALL SERVICE BOT E2E PASSED"
