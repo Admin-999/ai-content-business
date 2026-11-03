@@ -16,7 +16,9 @@ jobs:
           set -e
           echo "=== 0. Список моделей Groq ==="
           curl -s --max-time 30 https://api.groq.com/openai/v1/models \
-            -H "Authorization: Bearer $GROQ_API_KEY" | jq -r '.data[].id' | sort
+            -H "Authorization: Bearer $GROQ_API_KEY" -o /tmp/models.json
+          cat /tmp/models.json | head -c 3000; echo
+          jq -r '.data[].id' /tmp/models.json | sort || true
           B="$BACKEND_URL"
           echo "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAeklEQVR4nO3PUQkAIBTAQBMZ1FfaEH4cwmABbmvP+brFBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQgBY0oAUNaEEDWtCAFjSgBQ1oQQNa0IAWNKAFDWhBA1rQwHjEy8AF+uQxLRARc80AAAAASUVORK5CYII=" | base64 -d > /tmp/item.png
 
