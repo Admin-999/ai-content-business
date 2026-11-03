@@ -67,7 +67,7 @@ BACKEND_URL = os.getenv(
     "BACKEND_URL", "https://vsvolodin2014--ai-content-api-api.us-east-1.modal.run"
 ).rstrip("/")
 # Модель с распознаванием изображений (фото товаров Wildberries)
-GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "qwen/qwen3.8-27b")
 # API контента Wildberries (кабинет продавца)
 WB_CONTENT_API = os.getenv("WB_CONTENT_API", "https://content-api.wildberries.ru").rstrip("/")
 # Сколько ответов в сутки даёт один ИИ-бот
