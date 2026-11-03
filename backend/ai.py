@@ -3,6 +3,8 @@
 Цепочка провайдеров: Google Gemini -> Groq -> универсальный OpenAI-совместимый
 (OpenRouter, GitHub Models и любые другие). Работают те, у кого задан ключ.
 """
+import base64
+
 import httpx
 
 from config import (
@@ -10,6 +12,7 @@ from config import (
     GEMINI_MODEL,
     GROQ_API_KEY,
     GROQ_MODEL,
+    GROQ_VISION_MODEL,
     OPENAI_COMPAT_API_KEY,
     OPENAI_COMPAT_BASE_URL,
     OPENAI_COMPAT_MODEL,
@@ -61,6 +64,25 @@ def build_prompt(topic: str, content_type: str, tone: str, language: str) -> str
     )
 
 
+def _gemini_text(data: dict) -> str:
+    candidates = data.get("candidates") or []
+    parts = []
+    if candidates:
+        parts = (candidates[0].get("content") or {}).get("parts") or []
+    text = "".join(p.get("text", "") for p in parts).strip()
+    if not text:
+        raise AIError("Gemini вернул пустой ответ")
+    return text
+
+
+def _chat_text(data: dict, label: str) -> str:
+    choices = data.get("choices") or [{}]
+    text = (choices[0].get("message") or {}).get("content", "").strip()
+    if not text:
+        raise AIError(f"{label} вернул пустой ответ")
+    return text
+
+
 def _call_gemini(client: httpx.Client, prompt: str) -> str:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
     resp = client.post(
@@ -73,15 +95,7 @@ def _call_gemini(client: httpx.Client, prompt: str) -> str:
     )
     if resp.status_code != 200:
         raise AIError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}")
-    data = resp.json()
-    candidates = data.get("candidates") or []
-    parts = []
-    if candidates:
-        parts = (candidates[0].get("content") or {}).get("parts") or []
-    text = "".join(p.get("text", "") for p in parts).strip()
-    if not text:
-        raise AIError("Gemini вернул пустой ответ")
-    return text
+    return _gemini_text(resp.json())
 
 
 def _call_groq(client: httpx.Client, prompt: str) -> str:
@@ -97,11 +111,7 @@ def _call_groq(client: httpx.Client, prompt: str) -> str:
     )
     if resp.status_code != 200:
         raise AIError(f"Groq HTTP {resp.status_code}: {resp.text[:200]}")
-    choices = resp.json().get("choices") or [{}]
-    text = (choices[0].get("message") or {}).get("content", "").strip()
-    if not text:
-        raise AIError("Groq вернул пустой ответ")
-    return text
+    return _chat_text(resp.json(), "Groq")
 
 
 def _call_openai_compat(client: httpx.Client, prompt: str) -> str:
@@ -118,16 +128,11 @@ def _call_openai_compat(client: httpx.Client, prompt: str) -> str:
     )
     if resp.status_code != 200:
         raise AIError(f"AI HTTP {resp.status_code}: {resp.text[:200]}")
-    choices = resp.json().get("choices") or [{}]
-    text = (choices[0].get("message") or {}).get("content", "").strip()
-    if not text:
-        raise AIError("AI-провайдер вернул пустой ответ")
-    return text
+    return _chat_text(resp.json(), "AI-провайдер")
 
 
-def generate_content(topic: str, content_type: str, tone: str = "дружелюбный", language: str = "ru"):
-    """Возвращает (текст, имя_модели). Пробует провайдеров по очереди."""
-    prompt = build_prompt(topic, content_type, tone, language)
+def _text_providers():
+    """Список (метка, функция) текстовых провайдеров, у которых задан ключ."""
     providers = []
     if GEMINI_API_KEY:
         providers.append((f"gemini:{GEMINI_MODEL}", _call_gemini))
@@ -137,12 +142,82 @@ def generate_content(topic: str, content_type: str, tone: str = "дружелю�
         providers.append((f"compat:{OPENAI_COMPAT_MODEL}", _call_openai_compat))
     if not providers:
         raise AIError("Не настроен ни один AI-провайдер. Добавьте GEMINI_API_KEY или GROQ_API_KEY.")
+    return providers
 
+
+def _run_chain(providers):
+    """Пробует провайдеров по очереди. Возвращает (текст, имя_модели)."""
     last_error = None
     with httpx.Client(timeout=TIMEOUT) as client:
         for label, fn in providers:
             try:
-                return fn(client, prompt), label
+                return fn(client), label
             except (AIError, httpx.HTTPError) as e:
                 last_error = e
     raise AIError(str(last_error))
+
+
+def run_prompt(prompt: str):
+    """Базовый вызов LLM: один промпт без системной роли."""
+    return _run_chain(_text_providers())
+
+
+def generate_content(topic: str, content_type: str, tone: str = "дружелюбный", language: str = "ru"):
+    """Возвращает (текст, имя_модели)."""
+    return run_prompt(build_prompt(topic, content_type, tone, language))
+
+
+def chat_text(system: str, user: str):
+    """Диалоговый вызов для ИИ-ботов: роль бота + сообщение клиента."""
+    prompt = f"{system}\n\nСообщение клиента: {user}"
+    return run_prompt(prompt)
+
+
+def _vision_gemini(client: httpx.Client, prompt: str, b64: str, mime: str) -> str:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+    resp = client.post(
+        url,
+        headers={"x-goog-api-key": GEMINI_API_KEY},
+        json={
+            "contents": [{"parts": [
+                {"text": prompt},
+                {"inline_data": {"mime_type": mime, "data": b64}},
+            ]}],
+            "generationConfig": {"temperature": 0.4, "maxOutputTokens": 2048},
+        },
+    )
+    if resp.status_code != 200:
+        raise AIError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}")
+    return _gemini_text(resp.json())
+
+
+def _vision_groq(client: httpx.Client, prompt: str, b64: str, mime: str) -> str:
+    resp = client.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+        json={
+            "model": GROQ_VISION_MODEL,
+            "messages": [{"role": "user", "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+            ]}],
+            "temperature": 0.4,
+            "max_tokens": 2048,
+        },
+    )
+    if resp.status_code != 200:
+        raise AIError(f"Groq HTTP {resp.status_code}: {resp.text[:200]}")
+    return _chat_text(resp.json(), "Groq")
+
+
+def describe_image(image_bytes: bytes, mime: str, prompt: str):
+    """Распознавание фото товара (vision-модель). Возвращает (описание, имя_модели)."""
+    b64 = base64.b64encode(image_bytes).decode("ascii")
+    providers = []
+    if GEMINI_API_KEY:
+        providers.append((f"gemini:{GEMINI_MODEL}", lambda c: _vision_gemini(c, prompt, b64, mime)))
+    if GROQ_API_KEY:
+        providers.append((f"groq:{GROQ_VISION_MODEL}", lambda c: _vision_groq(c, prompt, b64, mime)))
+    if not providers:
+        raise AIError("Для анализа фото нужен GEMINI_API_KEY или GROQ_API_KEY.")
+    return _run_chain(providers)

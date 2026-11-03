@@ -1,0 +1,27 @@
+name: Автопостинг в Telegram-каналы (cron)
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"   # каждые 2 часа по UTC
+  workflow_dispatch:          # позволяет запустить вручную из вкладки Actions
+
+jobs:
+  autopost:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Запустить автопостинг на backend
+        shell: bash
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$BACKEND_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Не заданы секреты BACKEND_URL и/или CRON_SECRET (Settings -> Secrets and variables -> Actions)"
+            exit 1
+          fi
+          code=$(curl -s --max-time 600 -o /tmp/resp.json -w "%{http_code}" \
+            -X POST "$BACKEND_URL/api/cron/autopost" \
+            -H "X-Cron-Secret: $CRON_SECRET")
+          echo "HTTP $code"
+          cat /tmp/resp.json
+          test "$code" = "200"

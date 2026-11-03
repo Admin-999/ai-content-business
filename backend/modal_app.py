@@ -26,6 +26,7 @@ image = (
         "security",
         "deps",
         "ai",
+        "tgapi",
         "emailer",
         "routers",
     )

@@ -24,6 +24,7 @@
       </a>
       <div class="hidden items-center gap-6 text-sm text-slate-300 md:flex">
         <a href="#how" class="hover:text-white">Как работает</a>
+        <a href="#automation" class="hover:text-white">Автоматизация</a>
         <a href="#pricing" class="hover:text-white">Тарифы</a>
         <a href="#faq" class="hover:text-white">Вопросы</a>
         <a href="terms.html" class="hover:text-white">Документы</a>
@@ -59,8 +60,8 @@
     <p class="mt-4 text-sm text-slate-500">5 генераций в день бесплатно. Без карты. Без установки.</p>
     <div class="mx-auto mt-12 grid max-w-3xl grid-cols-3 gap-4 text-center">
       <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
-        <div class="text-2xl font-bold text-indigo-300">3</div>
-        <div class="mt-1 text-xs text-slate-400">типа контента</div>
+        <div class="text-2xl font-bold text-indigo-300">6</div>
+        <div class="mt-1 text-xs text-slate-400">инструментов в кабинете</div>
       </div>
       <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
         <div class="text-2xl font-bold text-indigo-300">5/день</div>
@@ -97,6 +98,37 @@
         </div>
         <h3 class="mt-4 text-lg font-semibold">Описания товаров</h3>
         <p class="mt-2 text-sm text-slate-400">Продающие карточки товаров с выгодами списком и призывом к действию. Для магазинов и маркетплейсов.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Автоматизация -->
+  <section id="automation" class="mx-auto max-w-6xl px-4 pb-20">
+    <h2 class="text-center text-3xl font-bold">Автоматизация под ключ</h2>
+    <p class="mx-auto mt-3 max-w-2xl text-center text-slate-400">
+      Сервис работает не только как генератор: подключите канал, магазин или бота — и контент появляется сам.
+    </p>
+    <div class="mt-10 grid gap-6 md:grid-cols-3">
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6">
+        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/15">
+          <svg class="h-6 w-6 text-indigo-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>
+        </div>
+        <h3 class="mt-4 text-lg font-semibold">Автопостинг в Telegram</h3>
+        <p class="mt-2 text-sm text-slate-400">Опишите канал один раз — ИИ сам пишет и публикует посты по расписанию: каждые 6, 12 или 24 часа. Без копирайтера и напоминаний.</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6">
+        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/15">
+          <svg class="h-6 w-6 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        </div>
+        <h3 class="mt-4 text-lg font-semibold">Карточки Wildberries из фото</h3>
+        <p class="mt-2 text-sm text-slate-400">Загрузите фото, название и цену — ИИ рассмотрит фото и составит описание, характеристики и ключевые слова. С подключённым кабинетом WB карточка публикуется сама.</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6">
+        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-fuchsia-500/15">
+          <svg class="h-6 w-6 text-fuchsia-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="15" x2="8" y2="16"/><line x1="16" y1="15" x2="16" y2="16"/></svg>
+        </div>
+        <h3 class="mt-4 text-lg font-semibold">ИИ-боты для клиентов</h3>
+        <p class="mt-2 text-sm text-slate-400">Соберите бота за пару минут: он отвечает клиентам в Telegram круглосуточно — консультирует по товарам, записывает на услуги и принимает заявки.</p>
       </div>
     </div>
   </section>
@@ -192,6 +224,10 @@
         <p class="mt-3 text-sm text-slate-400">Используются современные ИИ-модели Groq. Тексты получаются публикационно готовыми, но мы рекомендуем вычитывать их перед публикацией: ИИ может ошибаться в фактах.</p>
       </details>
       <details class="rounded-xl border border-white/10 bg-slate-900/60 p-5">
+        <summary class="font-medium">Безопасно ли давать доступ к каналу, боту или магазину?</summary>
+        <p class="mt-3 text-sm text-slate-400">Да. Мы просим только специальные API-токены (от @BotFather для Telegram или из настроек кабинета Wildberries), а не пароли. Токен можно в любой момент отозвать или заменить, а подключение в сервисе удаляется одной кнопкой.</p>
+      </details>
+      <details class="rounded-xl border border-white/10 bg-slate-900/60 p-5">
         <summary class="font-medium">Как работает оплата?</summary>
         <p class="mt-3 text-sm text-slate-400">Сейчас платежи работают в тестовом режиме: PRO активируется без списания денег. К запуску в продакшен подключается Stripe Checkout — форма оплаты уже подготовлена.</p>
       </details>
@@ -207,7 +243,7 @@
     <div class="mx-auto grid max-w-6xl gap-8 px-4 py-12 md:grid-cols-3">
       <div>
         <div class="text-lg font-bold"><span class="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">AI Контент</span></div>
-        <p class="mt-3 text-sm text-slate-400">Автоматическая генерация контента для малого бизнеса: посты, статьи, описания товаров.</p>
+        <p class="mt-3 text-sm text-slate-400">Генерация контента и автоматизация для малого бизнеса: посты, статьи, карточки Wildberries, автопостинг и ИИ-боты.</p>
       </div>
       <div class="text-sm">
         <div class="font-semibold text-slate-200">Сервис</div>

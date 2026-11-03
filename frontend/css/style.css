@@ -22,6 +22,27 @@ select.field option { background: #0f172a; }
 /* Активная вкладка в модалке авторизации */
 .auth-tab.active { background: #4f46e5; color: #fff; }
 
+/* Вкладки раздела «Автоматизация» */
+.autotab {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.autotab:hover { background: rgba(255, 255, 255, 0.08); }
+.autotab.active { background: #4f46e5; color: #fff; border-color: transparent; }
+
+/* Чипы выбора роли бота */
+.chip {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.8125rem;
+  color: #cbd5e1;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.chip:hover { background: rgba(255, 255, 255, 0.08); }
+.chip.active { background: #4f46e5; color: #fff; border-color: transparent; }
+
 /* details/summary без штатного маркера */
 details > summary { list-style: none; }
 details > summary::-webkit-details-marker { display: none; }

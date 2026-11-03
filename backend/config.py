@@ -60,3 +60,15 @@ PRO_PLUS_DAILY_LIMIT = _get_int("PRO_PLUS_DAILY_LIMIT", 300)
 PRO_PRICE_RUB = _get_int("PRO_PRICE_RUB", 299)
 PRO_PLUS_PRICE_RUB = _get_int("PRO_PLUS_PRICE_RUB", 990)
 PRO_PERIOD_DAYS = _get_int("PRO_PERIOD_DAYS", 30)
+
+# --- Автоматизация: Telegram и Wildberries ---
+# Публичный адрес этого backend, по нему Telegram шлёт обновления ИИ-ботов
+BACKEND_URL = os.getenv(
+    "BACKEND_URL", "https://vsvolodin2014--ai-content-api-api.us-east-1.modal.run"
+).rstrip("/")
+# Модель с распознаванием изображений (фото товаров Wildberries)
+GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+# API контента Wildberries (кабинет продавца)
+WB_CONTENT_API = os.getenv("WB_CONTENT_API", "https://content-api.wildberries.ru").rstrip("/")
+# Сколько ответов в сутки даёт один ИИ-бот
+BOT_DAILY_REPLY_LIMIT = _get_int("BOT_DAILY_REPLY_LIMIT", 200)

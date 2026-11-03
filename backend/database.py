@@ -50,6 +50,63 @@ DDL = [
         started_at TIMESTAMPTZ NOT NULL,
         expires_at TIMESTAMPTZ
     )""",
+    """CREATE TABLE IF NOT EXISTS channels (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        bot_token TEXT NOT NULL,
+        channel_username TEXT NOT NULL,
+        tone TEXT NOT NULL DEFAULT 'дружелюбный',
+        interval_hours INTEGER NOT NULL DEFAULT 12,
+        active INTEGER NOT NULL DEFAULT 1,
+        last_post_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_channels_active ON channels (active)",
+    """CREATE TABLE IF NOT EXISTS channel_posts (
+        id TEXT PRIMARY KEY,
+        channel_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        status TEXT NOT NULL,
+        error TEXT,
+        created_at TIMESTAMPTZ NOT NULL
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_channel_posts_channel ON channel_posts (channel_id, created_at)",
+    """CREATE TABLE IF NOT EXISTS bots (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        role TEXT NOT NULL,
+        tone TEXT NOT NULL,
+        knowledge TEXT NOT NULL,
+        bot_token TEXT NOT NULL,
+        webhook_secret TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 0,
+        replies_today INTEGER NOT NULL DEFAULT 0,
+        stat_date TEXT,
+        created_at TIMESTAMPTZ NOT NULL
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_bots_active ON bots (active)",
+    """CREATE TABLE IF NOT EXISTS wb_accounts (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        api_token TEXT NOT NULL,
+        added_at TIMESTAMPTZ NOT NULL
+    )""",
+    """CREATE TABLE IF NOT EXISTS wb_cards (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        price_rub INTEGER NOT NULL,
+        description TEXT NOT NULL,
+        characteristics TEXT NOT NULL,
+        keywords TEXT,
+        status TEXT NOT NULL,
+        error TEXT,
+        created_at TIMESTAMPTZ NOT NULL
+    )""",
 ]
 
 

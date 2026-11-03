@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 
 from config import ALLOW_ALL_ORIGINS, FRONTEND_ORIGINS, SECRET_KEY
 from database import init_db
-from routers import auth, billing, cron, generate, usage
+from routers import auth, billing, bots, channels, cron, generate, usage, wildberries
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("app")
@@ -83,6 +83,9 @@ async def log_errors_middleware(request: Request, call_next):
 app.include_router(auth.router)
 app.include_router(generate.router)
 app.include_router(usage.router)
+app.include_router(channels.router)
+app.include_router(bots.router)
+app.include_router(wildberries.router)
 app.include_router(billing.router)
 app.include_router(cron.router)
 
