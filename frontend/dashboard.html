@@ -201,8 +201,8 @@
           <summary class="cursor-pointer font-medium">Как это работает?</summary>
           <ol class="mt-2 list-decimal space-y-1 pl-5 text-slate-400">
             <li>Выберите маркетплейс, загрузите фото товара, напишите название и цену — ИИ рассмотрит фото и составит описание, характеристики и ключевые слова под требования площадки.</li>
-            <li>Для Wildberries можно подключить API-токен кабинета (Настройки → Доступ к API) — тогда карточка опубликуется сама.</li>
-            <li>Для Ozon, AliExpress и Яндекс Маркета карточка будет готова в один клик: скопируйте её и вставьте в кабинет магазина.</li>
+            <li>Для Wildberries, Ozon и Яндекс Маркета можно подключить кабинет продавца ниже — тогда карточка опубликуется сама.</li>
+            <li>Для AliExpress карточка будет готова в один клик: скопируйте её и вставьте в кабинет магазина.</li>
           </ol>
         </details>
 
@@ -224,11 +224,34 @@
             <button id="wbConnectBtn" type="button" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60">Подключить</button>
             <button id="wbDisconnectBtn" type="button" class="hidden rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-300 hover:bg-white/10">Отключить</button>
           </div>
-          <p id="wbStatusText" class="mt-2 text-xs text-slate-400"></p>
+          <p id="wbStatusText" class="mt-2 text-xs text-slate-400">Токен берётся в кабинете WB: Настройки → Доступ к API.</p>
+        </div>
+
+        <div id="ozonStoreBox" class="mt-4 hidden rounded-xl border border-white/10 bg-slate-950/40 p-4">
+          <h3 class="text-sm font-semibold">Магазин Ozon</h3>
+          <div class="mt-2 grid gap-3 md:grid-cols-2">
+            <input id="ozonClientId" type="password" class="field" maxlength="100" autocomplete="off" placeholder="Client-Id из кабинета Ozon">
+            <input id="ozonApiKey" type="password" class="field" maxlength="300" autocomplete="off" placeholder="Api-Key из кабинета Ozon">
+          </div>
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <button id="ozonConnectBtn" type="button" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60">Подключить</button>
+            <button id="ozonDisconnectBtn" type="button" class="hidden rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-300 hover:bg-white/10">Отключить</button>
+          </div>
+          <p id="ozonStatusText" class="mt-2 text-xs text-slate-400">Ключи создаются в кабинете Ozon: Настройки → API-ключи, тип «Продукты». Первая публикация может занять пару минут.</p>
+        </div>
+
+        <div id="ymStoreBox" class="mt-4 hidden rounded-xl border border-white/10 bg-slate-950/40 p-4">
+          <h3 class="text-sm font-semibold">Магазин Яндекс Маркета</h3>
+          <div class="mt-2 flex flex-wrap items-center gap-3">
+            <input id="ymToken" type="password" class="field min-w-48 flex-1" maxlength="300" autocomplete="off" placeholder="API-ключ кабинета Маркета (необязательно)">
+            <button id="ymConnectBtn" type="button" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60">Подключить</button>
+            <button id="ymDisconnectBtn" type="button" class="hidden rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-300 hover:bg-white/10">Отключить</button>
+          </div>
+          <p id="ymStatusText" class="mt-2 text-xs text-slate-400">Ключ создаётся в кабинете Маркета: Настройки → API-ключи.</p>
         </div>
 
         <p id="mpManualHint" class="mt-4 hidden rounded-xl border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
-          Автопубликация пока работает только для Wildberries. Для Ozon, AliExpress и Яндекс Маркета ИИ подготовит карточку — скопируйте её одной кнопкой и вставьте в кабинет магазина. Токены не нужны.
+          Для AliExpress карточка будет готова — скопируйте её одной кнопкой и вставьте в кабинет магазина. Токены не нужны.
         </p>
 
         <form id="wbCardForm" class="mt-4 grid gap-4 md:grid-cols-3">

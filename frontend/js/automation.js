@@ -257,53 +257,122 @@ async function apiForm(path, formData) {
 
   // ===== Маркетплейсы (Wildberries, Ozon, AliExpress, Яндекс Маркет) =====
   const MP_NAMES = { wb: "Wildberries", ozon: "Ozon", aliexpress: "AliExpress", yamarket: "Яндекс Маркет" };
+  const MP_BOXES = { wb: "wbStoreBox", ozon: "ozonStoreBox", yamarket: "ymStoreBox", aliexpress: null };
   const mpChips = Array.from(document.querySelectorAll("#mpChips .chip"));
 
   function selectMarketplace(name) {
     mpChips.forEach((c) => c.classList.toggle("active", c.dataset.v === name));
     $("wbPlatform").value = name;
-    const isWb = name === "wb";
-    $("wbStoreBox").classList.toggle("hidden", !isWb);
-    $("mpManualHint").classList.toggle("hidden", isWb);
+    for (const key of Object.keys(MP_BOXES)) {
+      if (MP_BOXES[key]) $(MP_BOXES[key]).classList.toggle("hidden", key !== name);
+    }
+    $("mpManualHint").classList.toggle("hidden", name !== "aliexpress");
   }
   mpChips.forEach((chip) => chip.addEventListener("click", () => selectMarketplace(chip.dataset.v)));
 
-  async function loadWbAccount() {
+  function setStoreStatus(prefix, connected, yesText, noText) {
+    $(prefix + "StatusText").textContent = connected ? yesText : noText;
+    $(prefix + "DisconnectBtn").classList.toggle("hidden", !connected);
+    $(prefix + "ConnectBtn").classList.toggle("hidden", connected);
+  }
+
+  async function loadMpAccounts() {
     try {
-      const data = await api("/api/wb/account");
-      const text = $("wbStatusText");
-      if (data.connected) {
-        text.textContent = "Магазин подключён. Новые карточки будут публиковаться автоматически.";
-        $("wbDisconnectBtn").classList.remove("hidden");
-        $("wbConnectBtn").classList.add("hidden");
-      } else {
-        text.textContent = "Магазин не подключён: карточки будут создаваться, но публиковать их придётся вручную.";
-        $("wbDisconnectBtn").classList.add("hidden");
-        $("wbConnectBtn").classList.remove("hidden");
-      }
+      const data = await api("/api/wb/accounts");
+      const by = {};
+      for (const a of data.accounts) by[a.platform] = a;
+      setStoreStatus(
+        "wb",
+        !!(by.wb && by.wb.connected),
+        "Магазин подключён. Новые карточки будут публиковаться автоматически.",
+        "Магазин не подключён: карточки будут создаваться, но публиковать их придётся вручную."
+      );
+      setStoreStatus(
+        "ozon",
+        !!(by.ozon && by.ozon.connected),
+        "Магазин Ozon подключён. Категория подбирается автоматически, публикация — сама.",
+        "Магазин не подключён: карточки будут создаваться, но публиковать их придётся вручную."
+      );
+      setStoreStatus(
+        "ym",
+        !!(by.yamarket && by.yamarket.connected),
+        "Магазин Маркета подключён. Новые карточки будут публиковаться автоматически.",
+        "Магазин не подключён: карточки будут создаваться, но публиковать их придётся вручную."
+      );
     } catch (err) {
       toast(err.message, "error");
     }
+  }
+
+  function connectBtnState(btn, busy, busyText, idleText) {
+    btn.disabled = busy;
+    btn.innerHTML = busy ? '<span class="spinner"></span>' + busyText : idleText;
   }
 
   $("wbConnectBtn").addEventListener("click", async () => {
     const token = $("wbToken").value.trim();
     if (token.length < 10) return toast("Вставьте API-токен из кабинета Wildberries (Настройки → Доступ к API).", "error");
     const btn = $("wbConnectBtn");
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>Проверяем токен…';
+    connectBtnState(btn, true, "Проверяем токен…", "Подключить");
     try {
-      const data = await api("/api/wb/connect", { method: "POST", body: { api_token: token } });
-      toast("Подключено! Доступно категорий: " + data.categories_available + ".", "success");
+      await api("/api/wb/connect", { method: "POST", body: { platform: "wb", api_token: token } });
+      toast("Wildberries подключён!", "success");
       $("wbToken").value = "";
-      loadWbAccount();
+      loadMpAccounts();
     } catch (err) {
       toast(err.message, "error");
     } finally {
-      btn.disabled = false;
-      btn.textContent = "Подключить";
+      connectBtnState(btn, false, "", "Подключить");
     }
   });
+
+  $("ozonConnectBtn").addEventListener("click", async () => {
+    const clientId = $("ozonClientId").value.trim();
+    const apiKey = $("ozonApiKey").value.trim();
+    if (clientId.length < 4 || apiKey.length < 8) return toast("Вставьте Client-Id и Api-Key из кабинета Ozon (Настройки → API-ключи).", "error");
+    const btn = $("ozonConnectBtn");
+    connectBtnState(btn, true, "Проверяем ключи…", "Подключить");
+    try {
+      await api("/api/wb/connect", { method: "POST", body: { platform: "ozon", client_id: clientId, api_key: apiKey } });
+      toast("Ozon подключён!", "success");
+      $("ozonClientId").value = "";
+      $("ozonApiKey").value = "";
+      loadMpAccounts();
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      connectBtnState(btn, false, "", "Подключить");
+    }
+  });
+
+  $("ymConnectBtn").addEventListener("click", async () => {
+    const token = $("ymToken").value.trim();
+    if (token.length < 10) return toast("Вставьте API-ключ из кабинета Яндекс Маркета (Настройки → API-ключи).", "error");
+    const btn = $("ymConnectBtn");
+    connectBtnState(btn, true, "Проверяем ключ…", "Подключить");
+    try {
+      await api("/api/wb/connect", { method: "POST", body: { platform: "yamarket", api_token: token } });
+      toast("Яндекс Маркет подключён!", "success");
+      $("ymToken").value = "";
+      loadMpAccounts();
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      connectBtnState(btn, false, "", "Подключить");
+    }
+  });
+
+  for (const [prefix, platform] of [["wb", "wb"], ["ozon", "ozon"], ["ym", "yamarket"]]) {
+    $(prefix + "DisconnectBtn").addEventListener("click", async () => {
+      try {
+        await api("/api/wb/account/" + platform, { method: "DELETE" });
+        toast("Магазин отключён.", "success");
+        loadMpAccounts();
+      } catch (err) {
+        toast(err.message, "error");
+      }
+    });
+  }
 
   $("wbDisconnectBtn").addEventListener("click", async () => {
     try {
@@ -316,7 +385,7 @@ async function apiForm(path, formData) {
   });
 
   const WB_STATUS = {
-    published: ["Опубликована на Wildberries", "text-emerald-300"],
+    published: ["Опубликована", "text-emerald-300"],
     ready: ["Готова к публикации вручную", "text-sky-300"],
     error: ["Не удалось опубликовать", "text-rose-400"],
   };
@@ -613,7 +682,7 @@ async function apiForm(path, formData) {
   // ===== Старт =====
   loadChannelSetup();
   loadChannels();
-  loadWbAccount();
+  loadMpAccounts();
   loadWbCards();
   loadBots();
 })();

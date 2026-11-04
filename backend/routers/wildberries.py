@@ -3,20 +3,23 @@
 Клиент выбирает маркетплейс (Wildberries, Ozon, AliExpress, Яндекс Маркет),
 загружает фото, название и цену. ИИ рассматривает фото (vision-модель) и
 составляет описание, характеристики и ключевые слова под требования площадки.
-Для Wildberries при подключённом API-токене кабинета продавца сервис пытается
-опубликовать карточку сам, по остальным маркетплейсам отдаёт готовый контент
-для ручной публикации.
+При подключённом кабинете продавца карточка публикуется сама (Wildberries,
+Ozon, Яндекс Маркет; публикацией в Ozon/Маркете занимается модуль mp.py),
+иначе отдаётся готовый контент для ручной публикации.
 """
 import json
+import os
 import re
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from pydantic import BaseModel, Field
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 import database
+import mp
 from ai import AIError, describe_image, run_prompt
-from config import WB_CONTENT_API
+from config import MP_PHOTOS_DIR, WB_CONTENT_API
 from deps import daily_limit, get_current_user, new_id, used_today, utcnow
 
 router = APIRouter(prefix="/api/wb", tags=["wildberries"])
@@ -26,10 +29,11 @@ PHOTO_MAX = 8 * 1024 * 1024
 ALLOWED_MIME = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 CMP_UPLOAD_URL = "https://cmp.wildberries.ru/cmp/uploadApiPhoto"
 
-# Маркетплейсы: подсказки для ИИ под требования каждой площадки
+# Маркетплейсы: подсказки для ИИ под требования площадки; auto — доступна ли автопубликация
 MARKETPLACES = {
     "wb": {
         "name": "Wildberries",
+        "auto": True,
         "persona": "Ты — специалист по карточкам товаров Wildberries с опытом 10 лет.",
         "description": "продающее описание 500–800 символов, без указания цены",
         "characters": "6–10 шт.",
@@ -37,6 +41,7 @@ MARKETPLACES = {
     },
     "ozon": {
         "name": "Ozon",
+        "auto": True,
         "persona": "Ты — специалист по карточкам товаров Ozon с опытом 10 лет.",
         "description": "продающее описание 500–1000 символов с выгодами для покупателя, без указания цены",
         "characters": "6–10 шт.",
@@ -44,6 +49,7 @@ MARKETPLACES = {
     },
     "aliexpress": {
         "name": "AliExpress",
+        "auto": False,
         "persona": "Ты — специалист по карточкам товаров AliExpress с опытом 10 лет.",
         "description": "простое продающее описание 300–600 символов короткими фразами, без указания цены",
         "characters": "6–10 шт.",
@@ -51,6 +57,7 @@ MARKETPLACES = {
     },
     "yamarket": {
         "name": "Яндекс Маркет",
+        "auto": True,
         "persona": "Ты — специалист по карточкам товаров Яндекс Маркета с опытом 10 лет.",
         "description": "фактическое описание 500–800 символов: факты и преимущества без воды, без указания цены",
         "characters": "8–12 шт.",
@@ -60,7 +67,10 @@ MARKETPLACES = {
 
 
 class WBConnectIn(BaseModel):
-    api_token: str = Field(min_length=10, max_length=300)
+    platform: str = "wb"
+    api_token: str = ""
+    client_id: str = ""
+    api_key: str = ""
 
 
 class WBError(Exception):
@@ -117,11 +127,10 @@ def _wb_get_subjects(token: str):
 
 
 def _pick_subject(subjects, name: str, keywords: str):
-    words = set(re.split(r"[^0-9a-zа-яё]+", f"{name} {keywords}".lower()))
-    words -= {"и", "в", "для", "на", "с", "из", "по"}
+    stems = mp._stems(mp._words(f"{name} {keywords or ''}"))
     best, best_score = None, 0
     for subject in subjects:
-        score = len(words & set(re.split(r"[^0-9a-zа-яё]+", subject.lower())))
+        score = len(stems & mp._stems(mp._words(subject)))
         if score > best_score:
             best, best_score = subject, score
     return best
@@ -180,38 +189,110 @@ def _wb_publish(token: str, photo_bytes: bytes, mime: str, name: str, card: dict
 
 @router.post("/connect")
 def wb_connect(body: WBConnectIn, user: dict = Depends(get_current_user)):
-    """Проверяет и запоминает API-токен кабинета продавца Wildberries."""
-    token = body.api_token.strip()
-    try:
-        subjects = _wb_get_subjects(token)
-    except WBError as e:
+    """Проверяет и запоминает ключи кабинета продавца маркетплейса."""
+    platform = (body.platform or "wb").strip().lower()
+    if platform not in MARKETPLACES:
+        raise HTTPException(status_code=422, detail="Неизвестный маркетплейс.")
+    if not MARKETPLACES[platform]["auto"]:
         raise HTTPException(
             status_code=422,
-            detail=f"{e} Токен берётся в кабинете WB: Настройки -> Доступ к API.",
+            detail=f"Автопубликация в {MARKETPLACES[platform]['name']} пока не поддерживается — карточка создаётся готовой к ручной вставке.",
         )
-    database.execute("DELETE FROM wb_accounts WHERE user_id = %s", (user["id"],))
+
+    if platform == "wb":
+        token = body.api_token.strip()
+        if len(token) < 10:
+            raise HTTPException(status_code=422, detail="Вставьте API-токен кабинета Wildberries.")
+        try:
+            subjects = _wb_get_subjects(token)
+        except WBError as e:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{e} Токен берётся в кабинете WB: Настройки -> Доступ к API.",
+            )
+        creds, extra = token, None
+    elif platform == "ozon":
+        client_id = body.client_id.strip()
+        api_key = body.api_key.strip()
+        if len(client_id) < 4 or len(api_key) < 8:
+            raise HTTPException(status_code=422, detail="Вставьте Client-Id и Api-Key из кабинета Ozon.")
+        try:
+            mp.ozon_validate(client_id, api_key)
+        except mp.MarketplaceError as e:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{e} Ключи создаются в кабинете Ozon: Настройки -> API-ключи (доступ «Продукты»).",
+            )
+        creds, extra = json.dumps({"client_id": client_id, "api_key": api_key}), None
+    else:
+        token = body.api_token.strip()
+        if len(token) < 10:
+            raise HTTPException(status_code=422, detail="Вставьте API-ключ кабинета Яндекс Маркета.")
+        try:
+            campaign_id = mp.yamarket_validate(token)
+        except mp.MarketplaceError as e:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{e} Ключ создаётся в кабинете Маркета: Настройки -> API-ключи.",
+            )
+        creds, extra = token, json.dumps({"campaign_id": campaign_id})
+
     database.execute(
-        "INSERT INTO wb_accounts (id, user_id, api_token, added_at) VALUES (%s, %s, %s, %s)",
-        (new_id(), user["id"], token, utcnow()),
+        "DELETE FROM wb_accounts WHERE user_id = %s AND platform = %s",
+        (user["id"], platform),
     )
-    return {"connected": True, "categories_available": len(subjects)}
+    database.execute(
+        "INSERT INTO wb_accounts (id, user_id, platform, api_token, extra, added_at) VALUES (%s, %s, %s, %s, %s, %s)",
+        (new_id(), user["id"], platform, creds, extra, utcnow()),
+    )
+    result = {"connected": True, "platform": platform, "platform_name": MARKETPLACES[platform]["name"]}
+    if platform == "wb":
+        result["categories_available"] = len(subjects)
+    return result
 
 
-@router.get("/account")
-def wb_account(user: dict = Depends(get_current_user)):
-    row = database.fetchone(
-        "SELECT id, added_at FROM wb_accounts WHERE user_id = %s", (user["id"],)
+@router.get("/accounts")
+def mp_accounts(user: dict = Depends(get_current_user)):
+    """Статус подключения магазинов по всем маркетплейсам."""
+    rows = database.fetchall(
+        "SELECT platform, added_at FROM wb_accounts WHERE user_id = %s", (user["id"],)
     )
+    connected = {r[0]: r[1] for r in rows}
     return {
-        "connected": bool(row),
-        "added_at": database.as_dt(row[1]) if row else None,
+        "accounts": [
+            {
+                "platform": key,
+                "name": meta["name"],
+                "auto": meta["auto"],
+                "connected": key in connected,
+                "added_at": database.as_dt(connected[key]) if key in connected else None,
+            }
+            for key, meta in MARKETPLACES.items()
+        ]
     }
 
 
-@router.delete("/account")
-def wb_disconnect(user: dict = Depends(get_current_user)):
-    database.execute("DELETE FROM wb_accounts WHERE user_id = %s", (user["id"],))
-    return {"connected": False}
+@router.delete("/account/{platform}")
+def mp_disconnect(platform: str, user: dict = Depends(get_current_user)):
+    if platform not in MARKETPLACES:
+        raise HTTPException(status_code=422, detail="Неизвестный маркетплейс.")
+    database.execute(
+        "DELETE FROM wb_accounts WHERE user_id = %s AND platform = %s", (user["id"], platform)
+    )
+    return {"connected": False, "platform": platform}
+
+
+@router.get("/photos/{filename}")
+def mp_photo_file(filename: str):
+    """Публичная раздача фото товаров — по этому адресу их скачивают Ozon и Яндекс Маркет."""
+    ext = filename.rsplit(".", 1)[1] if "." in filename else ""
+    if not re.fullmatch(r"[A-Za-z0-9]+\.(jpg|png|webp)", filename) or ext not in mp.PHOTO_MIME.values():
+        raise HTTPException(status_code=404, detail="Фото не найдено.")
+    path = os.path.join(MP_PHOTOS_DIR, filename)
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="Фото не найдено.")
+    media_type = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}[ext]
+    return FileResponse(path, media_type=media_type)
 
 
 @router.post("/cards")
@@ -269,18 +350,43 @@ def create_card(
     if not description:
         raise HTTPException(status_code=502, detail="Модель вернула пустое описание, попробуйте ещё раз.")
 
-    account = database.fetchone(
-        "SELECT api_token FROM wb_accounts WHERE user_id = %s", (user["id"],)
-    )
     status, error = "ready", None
     subject = None
-    if platform == "wb" and account:
-        try:
-            subject = _wb_publish(account[0], photo_bytes, mime, name, card)
-            status = "published"
-        except WBError as e:
-            status = "error"
-            error = str(e)[:300]
+    if platform == "wb":
+        account = database.fetchone(
+            "SELECT api_token, extra FROM wb_accounts WHERE user_id = %s AND platform = 'wb'",
+            (user["id"],),
+        )
+        if account:
+            try:
+                subject = _wb_publish(account[0], photo_bytes, mime, name, card)
+                status = "published"
+            except WBError as e:
+                status = "error"
+                error = str(e)[:300]
+    elif platform in ("ozon", "yamarket"):
+        account = database.fetchone(
+            "SELECT api_token, extra FROM wb_accounts WHERE user_id = %s AND platform = %s",
+            (user["id"], platform),
+        )
+        if account:
+            try:
+                photo_url = mp.save_photo(photo_bytes, mime)
+                if platform == "ozon":
+                    creds = json.loads(account[0])
+                    subject = mp.ozon_publish(
+                        creds["client_id"], creds["api_key"], photo_url, name, price_rub, card
+                    )
+                else:
+                    extra = json.loads(account[1] or "{}")
+                    campaign_id = extra.get("campaign_id")
+                    if not campaign_id:
+                        raise mp.MarketplaceError("Магазин Маркета подключён без кампании — подключите его заново.")
+                    subject = mp.yamarket_publish(account[0], campaign_id, photo_url, name, price_rub, card)
+                status = "published"
+            except (mp.MarketplaceError, ValueError) as e:
+                status = "error"
+                error = str(e)[:300]
 
     database.execute(
         "INSERT INTO generations (id, user_id, topic, content_type, tone, language, result, model, created_at) "

@@ -31,6 +31,7 @@ image = (
         "igapi",
         "igcards",
         "emailer",
+        "mp",
         "routers",
     )
 )
@@ -41,7 +42,7 @@ image = (
     secrets=[modal.Secret.from_name("ai-content-secrets"), modal.Secret.from_name("telegram-bot")],
     max_containers=1,
     cpu=0.5,
-    memory=256,
+    memory=2048,
     scaledown_window=900,
     volumes={"/data": volume},
 )
