@@ -108,14 +108,14 @@
       </div>
     </aside>
 
-    <!-- Автоматизация: Telegram-каналы, Wildberries, ИИ-боты -->
+    <!-- Автоматизация: Telegram-каналы, маркетплейсы, ИИ-боты -->
     <section id="automation" class="rounded-2xl border border-white/10 bg-slate-900/60 p-6 lg:col-span-5">
       <h2 class="text-2xl font-bold">Автоматизация</h2>
-      <p class="mt-1 text-sm text-slate-400">Подключите Telegram-канал или Instagram, магазин Wildberries или соберите ИИ-бота — дальше всё работает само.</p>
+      <p class="mt-1 text-sm text-slate-400">Подключите Telegram-канал или Instagram, создайте карточки товаров для маркетплейсов или соберите ИИ-бота — дальше всё работает само.</p>
 
       <div class="mt-4 flex flex-wrap gap-2">
         <button type="button" data-tab="channels" class="autotab rounded-lg px-4 py-2 text-sm font-semibold">Каналы и Instagram</button>
-        <button type="button" data-tab="wb" class="autotab rounded-lg px-4 py-2 text-sm font-semibold">Wildberries</button>
+        <button type="button" data-tab="wb" class="autotab rounded-lg px-4 py-2 text-sm font-semibold">Маркетплейсы</button>
         <button type="button" data-tab="bots" class="autotab rounded-lg px-4 py-2 text-sm font-semibold">ИИ-боты</button>
       </div>
 
@@ -195,18 +195,29 @@
         <div id="channelList" class="mt-5 space-y-3"></div>
       </div>
 
-      <!-- Вкладка: Wildberries -->
+      <!-- Вкладка: Маркетплейсы (Wildberries, Ozon, AliExpress, Яндекс Маркет) -->
       <div id="tab-wb" class="autotab-pane mt-5 hidden">
         <details class="rounded-xl border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
           <summary class="cursor-pointer font-medium">Как это работает?</summary>
           <ol class="mt-2 list-decimal space-y-1 pl-5 text-slate-400">
-            <li>Загрузите фото товара, напишите название и цену — ИИ рассмотрит фото и составит полное описание, характеристики и ключевые слова.</li>
-            <li>Если подключить API-токен кабинета WB (Настройки → Доступ к API), сервис попробует опубликовать карточку сам.</li>
-            <li>Без токена карточка всё равно будет готова — скопируйте её и вставьте в кабинет вручную.</li>
+            <li>Выберите маркетплейс, загрузите фото товара, напишите название и цену — ИИ рассмотрит фото и составит описание, характеристики и ключевые слова под требования площадки.</li>
+            <li>Для Wildberries можно подключить API-токен кабинета (Настройки → Доступ к API) — тогда карточка опубликуется сама.</li>
+            <li>Для Ozon, AliExpress и Яндекс Маркета карточка будет готова в один клик: скопируйте её и вставьте в кабинет магазина.</li>
           </ol>
         </details>
 
-        <div class="mt-4 rounded-xl border border-white/10 bg-slate-950/40 p-4">
+        <div class="mt-4">
+          <span class="mb-1 block text-sm font-medium text-slate-300">Маркетплейс</span>
+          <div id="mpChips" class="flex flex-wrap gap-2">
+            <button type="button" class="chip active" data-v="wb">Wildberries</button>
+            <button type="button" class="chip" data-v="ozon">Ozon</button>
+            <button type="button" class="chip" data-v="aliexpress">AliExpress</button>
+            <button type="button" class="chip" data-v="yamarket">Яндекс Маркет</button>
+          </div>
+          <input type="hidden" id="wbPlatform" value="wb">
+        </div>
+
+        <div id="wbStoreBox" class="mt-4 rounded-xl border border-white/10 bg-slate-950/40 p-4">
           <h3 class="text-sm font-semibold">Магазин Wildberries</h3>
           <div class="mt-2 flex flex-wrap items-center gap-3">
             <input id="wbToken" type="password" class="field min-w-48 flex-1" maxlength="300" autocomplete="off" placeholder="API-токен кабинета продавца WB (необязательно)">
@@ -215,6 +226,10 @@
           </div>
           <p id="wbStatusText" class="mt-2 text-xs text-slate-400"></p>
         </div>
+
+        <p id="mpManualHint" class="mt-4 hidden rounded-xl border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
+          Автопубликация пока работает только для Wildberries. Для Ozon, AliExpress и Яндекс Маркета ИИ подготовит карточку — скопируйте её одной кнопкой и вставьте в кабинет магазина. Токены не нужны.
+        </p>
 
         <form id="wbCardForm" class="mt-4 grid gap-4 md:grid-cols-3">
           <div>

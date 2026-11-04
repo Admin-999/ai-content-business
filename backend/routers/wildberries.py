@@ -1,9 +1,11 @@
-"""Карточки товаров Wildberries из фото.
+"""Карточки товаров для маркетплейсов из фото.
 
-Клиент загружает фото, название и цену. ИИ рассматривает фото (vision-модель),
-составляет описание, характеристики и ключевые слова. Если подключён API-токен
-кабинета продавца — пытается опубликовать карточку, иначе отдаёт готовый
-контент для ручной публикации.
+Клиент выбирает маркетплейс (Wildberries, Ozon, AliExpress, Яндекс Маркет),
+загружает фото, название и цену. ИИ рассматривает фото (vision-модель) и
+составляет описание, характеристики и ключевые слова под требования площадки.
+Для Wildberries при подключённом API-токене кабинета продавца сервис пытается
+опубликовать карточку сам, по остальным маркетплейсам отдаёт готовый контент
+для ручной публикации.
 """
 import json
 import re
@@ -24,6 +26,38 @@ PHOTO_MAX = 8 * 1024 * 1024
 ALLOWED_MIME = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 CMP_UPLOAD_URL = "https://cmp.wildberries.ru/cmp/uploadApiPhoto"
 
+# Маркетплейсы: подсказки для ИИ под требования каждой площадки
+MARKETPLACES = {
+    "wb": {
+        "name": "Wildberries",
+        "persona": "Ты — специалист по карточкам товаров Wildberries с опытом 10 лет.",
+        "description": "продающее описание 500–800 символов, без указания цены",
+        "characters": "6–10 шт.",
+        "keywords": "10–15 поисковых слов через запятую",
+    },
+    "ozon": {
+        "name": "Ozon",
+        "persona": "Ты — специалист по карточкам товаров Ozon с опытом 10 лет.",
+        "description": "продающее описание 500–1000 символов с выгодами для покупателя, без указания цены",
+        "characters": "6–10 шт.",
+        "keywords": "10–15 поисковых слов через запятую",
+    },
+    "aliexpress": {
+        "name": "AliExpress",
+        "persona": "Ты — специалист по карточкам товаров AliExpress с опытом 10 лет.",
+        "description": "простое продающее описание 300–600 символов короткими фразами, без указания цены",
+        "characters": "6–10 шт.",
+        "keywords": "10–15 поисковых слов через запятую: русские и 3–5 английских",
+    },
+    "yamarket": {
+        "name": "Яндекс Маркет",
+        "persona": "Ты — специалист по карточкам товаров Яндекс Маркета с опытом 10 лет.",
+        "description": "фактическое описание 500–800 символов: факты и преимущества без воды, без указания цены",
+        "characters": "8–12 шт.",
+        "keywords": "10–15 поисковых слов через запятую",
+    },
+}
+
 
 class WBConnectIn(BaseModel):
     api_token: str = Field(min_length=10, max_length=300)
@@ -41,15 +75,16 @@ def _vision_prompt() -> str:
     )
 
 
-def _card_prompt(name: str, price: int, vision_text: str) -> str:
+def _card_prompt(name: str, price: int, vision_text: str, platform: str) -> str:
+    mp = MARKETPLACES.get(platform, MARKETPLACES["wb"])
     return (
-        "Ты — специалист по карточкам товаров Wildberries с опытом 10 лет.\n"
+        f"{mp['persona']}\n"
         f"Данные товара:\n- Название: {name}\n- Цена: {price} руб.\n"
         f"- Что видно на фото: {vision_text}\n"
         "Составь карточку товара. Верни СТРОГО один JSON-объект без markdown и пояснений:\n"
-        '{"description": "продающее описание 500–800 символов, без указания цены", '
-        '"characteristics": [{"name": "название характеристики", "value": "значение"}] — 6–10 шт., '
-        '"keywords": "10–15 поисковых слов через запятую"}'
+        '{"description": "' + mp["description"] + '", '
+        '"characteristics": [{"name": "название характеристики", "value": "значение"}] — ' + mp["characters"] + ", "
+        '"keywords": "' + mp["keywords"] + '"}'
     )
 
 
@@ -184,6 +219,7 @@ def create_card(
     photo: UploadFile = File(...),
     name: str = Form(...),
     price_rub: int = Form(...),
+    platform: str = Form("wb"),
     user: dict = Depends(get_current_user),
 ):
     name = name.strip()
@@ -191,6 +227,10 @@ def create_card(
         raise HTTPException(status_code=422, detail="Укажите название товара (минимум 3 символа).")
     if not (1 <= price_rub <= 10_000_000):
         raise HTTPException(status_code=422, detail="Укажите цену в рублях от 1 до 10 000 000.")
+    platform = (platform or "wb").strip().lower()
+    if platform not in MARKETPLACES:
+        raise HTTPException(status_code=422, detail="Неизвестный маркетплейс. Доступны: Wildberries, Ozon, AliExpress, Яндекс Маркет.")
+    mp_name = MARKETPLACES[platform]["name"]
 
     limit = daily_limit(user["plan"])
     used = used_today(user["id"])
@@ -211,7 +251,7 @@ def create_card(
 
     try:
         vision_text, vision_model = describe_image(photo_bytes, mime, _vision_prompt())
-        card, model = run_prompt(_card_prompt(name, price_rub, vision_text))
+        card, model = run_prompt(_card_prompt(name, price_rub, vision_text, platform))
         card = _extract_json(card)
     except AIError as e:
         raise HTTPException(
@@ -234,7 +274,7 @@ def create_card(
     )
     status, error = "ready", None
     subject = None
-    if account:
+    if platform == "wb" and account:
         try:
             subject = _wb_publish(account[0], photo_bytes, mime, name, card)
             status = "published"
@@ -245,15 +285,16 @@ def create_card(
     database.execute(
         "INSERT INTO generations (id, user_id, topic, content_type, tone, language, result, model, created_at) "
         "VALUES (%s, %s, %s, 'product', 'продающий', 'ru', %s, %s, %s)",
-        (new_id(), user["id"], f"Карточка WB: {name}", description, model, utcnow()),
+        (new_id(), user["id"], f"Карточка {mp_name}: {name}", description, model, utcnow()),
     )
     wid = new_id()
     database.execute(
-        "INSERT INTO wb_cards (id, user_id, name, price_rub, description, characteristics, keywords, status, error, created_at) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        "INSERT INTO wb_cards (id, user_id, platform, name, price_rub, description, characteristics, keywords, status, error, created_at) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
         (
             wid,
             user["id"],
+            platform,
             name,
             price_rub,
             description,
@@ -267,6 +308,8 @@ def create_card(
     used += 1
     return {
         "id": wid,
+        "platform": platform,
+        "platform_name": mp_name,
         "name": name,
         "price_rub": price_rub,
         "description": description,
@@ -286,27 +329,29 @@ def create_card(
 @router.get("/cards")
 def list_cards(user: dict = Depends(get_current_user)):
     rows = database.fetchall(
-        "SELECT id, name, price_rub, description, characteristics, keywords, status, error, created_at "
+        "SELECT id, platform, name, price_rub, description, characteristics, keywords, status, error, created_at "
         "FROM wb_cards WHERE user_id = %s ORDER BY created_at DESC LIMIT 20",
         (user["id"],),
     )
     cards = []
     for r in rows:
         try:
-            chars = json.loads(r[4]) if r[4] else []
+            chars = json.loads(r[5]) if r[5] else []
         except ValueError:
             chars = []
         cards.append(
             {
                 "id": r[0],
-                "name": r[1],
-                "price_rub": r[2],
-                "description": r[3],
+                "platform": r[1] or "wb",
+                "platform_name": MARKETPLACES.get(r[1] or "wb", MARKETPLACES["wb"])["name"],
+                "name": r[2],
+                "price_rub": r[3],
+                "description": r[4],
                 "characteristics": chars,
-                "keywords": r[5],
-                "status": r[6],
-                "error": r[7],
-                "created_at": database.as_dt(r[8]),
+                "keywords": r[6],
+                "status": r[7],
+                "error": r[8],
+                "created_at": database.as_dt(r[9]),
             }
         )
     return {"cards": cards}

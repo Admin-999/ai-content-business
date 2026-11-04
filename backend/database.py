@@ -108,6 +108,7 @@ DDL = [
     """CREATE TABLE IF NOT EXISTS wb_cards (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
+        platform TEXT NOT NULL DEFAULT 'wb',
         name TEXT NOT NULL,
         price_rub INTEGER NOT NULL,
         description TEXT NOT NULL,
@@ -222,6 +223,9 @@ _IG_BOT_COLUMNS = (
     ("ig_user_id", "TEXT"),
     ("token_expires_at", "TIMESTAMPTZ"),
 )
+_WB_CARD_COLUMNS = (
+    ("platform", "TEXT NOT NULL DEFAULT 'wb'"),
+)
 
 
 def _add_missing_columns(table: str, columns) -> None:
@@ -247,4 +251,5 @@ def init_db() -> None:
         execute(ddl)
     _add_missing_columns("channels", _IG_CHANNEL_COLUMNS)
     _add_missing_columns("bots", _IG_BOT_COLUMNS)
+    _add_missing_columns("wb_cards", _WB_CARD_COLUMNS)
     logger.info("База данных готова")

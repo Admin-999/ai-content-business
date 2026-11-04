@@ -1,4 +1,4 @@
-// Раздел «Автоматизация»: каналы (Telegram, Instagram), Wildberries, ИИ-боты.
+// Раздел «Автоматизация»: каналы (Telegram, Instagram), маркетплейсы (Wildberries, Ozon, AliExpress, Яндекс Маркет), ИИ-боты.
 // Использует api()/toast()/copyText()/$/fmtDate/loadUsage из api.js и dashboard.js.
 
 // Отправка формы с файлом (FormData, без Content-Type: application/json)
@@ -255,7 +255,19 @@ async function apiForm(path, formData) {
     } catch (err) { /* имя бота не критично для работы */ }
   }
 
-  // ===== Wildberries =====
+  // ===== Маркетплейсы (Wildberries, Ozon, AliExpress, Яндекс Маркет) =====
+  const MP_NAMES = { wb: "Wildberries", ozon: "Ozon", aliexpress: "AliExpress", yamarket: "Яндекс Маркет" };
+  const mpChips = Array.from(document.querySelectorAll("#mpChips .chip"));
+
+  function selectMarketplace(name) {
+    mpChips.forEach((c) => c.classList.toggle("active", c.dataset.v === name));
+    $("wbPlatform").value = name;
+    const isWb = name === "wb";
+    $("wbStoreBox").classList.toggle("hidden", !isWb);
+    $("mpManualHint").classList.toggle("hidden", isWb);
+  }
+  mpChips.forEach((chip) => chip.addEventListener("click", () => selectMarketplace(chip.dataset.v)));
+
   async function loadWbAccount() {
     try {
       const data = await api("/api/wb/account");
@@ -321,9 +333,10 @@ async function apiForm(path, formData) {
     box.classList.remove("hidden");
     box.innerHTML = "";
 
+    const mpName = MP_NAMES[c.platform] || "Wildberries";
     const h = document.createElement("h3");
     h.className = "font-semibold";
-    h.textContent = c.name + " — " + c.price_rub + " ₽";
+    h.textContent = mpName + ": " + c.name + " — " + c.price_rub + " ₽";
     const st = document.createElement("p");
     const statusInfo = WB_STATUS[c.publish_status] || WB_STATUS.ready;
     st.className = "mt-1 text-xs font-semibold " + statusInfo[1];
@@ -380,7 +393,7 @@ async function apiForm(path, formData) {
         const s = document.createElement("summary");
         s.className = "cursor-pointer text-sm font-medium";
         const statusInfo = WB_STATUS[c.status] || WB_STATUS.ready;
-        s.textContent = c.name + " — " + c.price_rub + " ₽ (" + statusInfo[0].toLowerCase() + ")";
+        s.textContent = (c.platform_name || MP_NAMES[c.platform] || "Wildberries") + " · " + c.name + " — " + c.price_rub + " ₽ (" + statusInfo[0].toLowerCase() + ")";
         const meta = document.createElement("p");
         meta.className = "mt-1 text-xs text-slate-500";
         meta.textContent = fmtDate(c.created_at) + (c.error ? " · " + c.error : "");
@@ -409,6 +422,7 @@ async function apiForm(path, formData) {
     fd.append("photo", file);
     fd.append("name", name);
     fd.append("price_rub", String(price));
+    fd.append("platform", $("wbPlatform").value);
 
     const btn = $("wbCardBtn");
     btn.disabled = true;
