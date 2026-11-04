@@ -29,10 +29,10 @@ class InstagramError(Exception):
         self.status_code = status_code
 
 
-def _request(method: str, url: str, params=None, data=None) -> dict:
+def _request(method: str, url: str, params=None, data=None, json_body=None, headers=None) -> dict:
     try:
         with httpx.Client(timeout=TIMEOUT) as client:
-            resp = client.request(method, url, params=params, data=data)
+            resp = client.request(method, url, params=params, data=data, json=json_body, headers=headers)
     except httpx.HTTPError as e:
         raise InstagramError(f"Instagram недоступен: {e}")
     if resp.status_code != 200:
@@ -125,3 +125,34 @@ def publish_image(token: str, ig_user_id: str, image_url: str, caption: str) -> 
             raise InstagramError(f"Instagram не принял картинку ({status}).")
         time.sleep(_MEDIA_WAIT_STEP)
     raise InstagramError("Instagram слишком долго обрабатывал картинку — попробуем в следующий запуск.")
+
+
+def send_message(token: str, ig_user_id: str, recipient_id: str, text: str):
+    """Ответ клиенту в Direct Instagram (Instagram messaging)."""
+    return _request(
+        "POST",
+        f"{API_BASE}/{API_VERSION}/{ig_user_id}/messages",
+        headers={"Authorization": f"Bearer {token}"},
+        json_body={"recipient": {"id": recipient_id}, "message": {"text": text[:1000]}},
+    )
+
+
+def configure_app_webhook(app_id: str, app_secret: str, callback_url: str, verify_token: str,
+                          fields: str = "messages"):
+    """Регистрирует webhook приложения Meta (объект instagram) на наш backend.
+
+    Управление приложениями идёт через graph.facebook.com с app access token
+    (app_id|app_secret). Если API не примет подписку, клиент может вписать
+    callback_url и verify_token вручную в настройках приложения (Webhooks).
+    """
+    return _request(
+        "POST",
+        f"https://graph.facebook.com/{API_VERSION}/{app_id}/subscriptions",
+        params={"access_token": f"{app_id}|{app_secret}"},
+        data={
+            "object": "instagram",
+            "callback_url": callback_url,
+            "fields": fields,
+            "verify_token": verify_token,
+        },
+    )

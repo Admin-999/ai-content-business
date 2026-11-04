@@ -436,7 +436,21 @@ async function apiForm(path, formData) {
     });
   });
 
+  const botPlatformChips = Array.from(document.querySelectorAll("#botPlatformChips .chip"));
+
+  function selectBotPlatform(name) {
+    botPlatformChips.forEach((c) => c.classList.toggle("active", c.dataset.v === name));
+    $("botPlatform").value = name;
+    const isIg = name === "instagram";
+    $("botIgFields").classList.toggle("hidden", !isIg);
+    $("botTgTokenField").classList.toggle("hidden", isIg);
+    $("botIgHint").classList.toggle("hidden", !isIg);
+    $("botTgHint").classList.toggle("hidden", isIg);
+  }
+  botPlatformChips.forEach((chip) => chip.addEventListener("click", () => selectBotPlatform(chip.dataset.v)));
+
   function botCard(bot) {
+    const isIg = bot.platform === "instagram";
     const card = document.createElement("div");
     card.className = "rounded-xl border border-white/10 bg-slate-950/60 p-4";
 
@@ -445,12 +459,17 @@ async function apiForm(path, formData) {
     const title = document.createElement("span");
     title.className = "font-semibold";
     title.textContent = bot.name;
+    const plat = document.createElement("span");
+    plat.className = isIg
+      ? "rounded-full bg-fuchsia-500/15 px-2.5 py-0.5 text-xs font-semibold text-fuchsia-300"
+      : "rounded-full bg-sky-500/15 px-2.5 py-0.5 text-xs font-semibold text-sky-300";
+    plat.textContent = isIg ? "Instagram Direct" : "Telegram";
     const badge = document.createElement("span");
     badge.className = bot.active
       ? "rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-300"
       : "rounded-full bg-slate-700 px-2.5 py-0.5 text-xs font-semibold text-slate-300";
     badge.textContent = bot.active ? "Отвечает клиентам" : "Остановлен";
-    head.append(title, badge);
+    head.append(title, plat, badge);
 
     const meta = document.createElement("p");
     meta.className = "mt-1 text-xs text-slate-400";
@@ -459,8 +478,12 @@ async function apiForm(path, formData) {
     const hint = document.createElement("p");
     hint.className = "mt-1 text-xs " + (bot.active ? "text-emerald-400/80" : "text-slate-500");
     hint.textContent = bot.active
-      ? "Бот работает: клики, вопросы и заявки принимает в Telegram круглосуточно."
-      : "Нажмите «Запустить» — и бот начнёт отвечать клиентам в Telegram.";
+      ? isIg
+        ? "Бот работает: отвечает клиентам в Direct Instagram круглосуточно."
+        : "Бот работает: клики, вопросы и заявки принимает в Telegram круглосуточно."
+      : isIg
+        ? "Нажмите «Запустить» — и бот начнёт отвечать клиентам в Direct Instagram."
+        : "Нажмите «Запустить» — и бот начнёт отвечать клиентам в Telegram.";
 
     const actions = document.createElement("div");
     actions.className = "mt-3 flex flex-wrap gap-2";
@@ -500,25 +523,42 @@ async function apiForm(path, formData) {
 
   $("botForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const body = {
-      name: $("botName").value.trim(),
-      role: $("botRole").value.trim(),
-      tone: $("botTone").value,
-      knowledge: $("botKnowledge").value.trim(),
-      bot_token: $("botToken").value.trim(),
-    };
-    if (body.name.length < 2) return toast("Введите имя бота.", "error");
-    if (body.role.length < 2) return toast("Выберите или напишите роль бота.", "error");
-    if (body.knowledge.length < 10) return toast("Расскажите боту о бизнесе: минимум 10 символов.", "error");
-    if (!body.bot_token) return toast("Вставьте токен бота, полученный у @BotFather.", "error");
+    const platform = $("botPlatform").value;
+    const name = $("botName").value.trim();
+    const role = $("botRole").value.trim();
+    const tone = $("botTone").value;
+    const knowledge = $("botKnowledge").value.trim();
+    if (name.length < 2) return toast("Введите имя бота.", "error");
+    if (role.length < 2) return toast("Выберите или напишите роль бота.", "error");
+    if (knowledge.length < 10) return toast("Расскажите боту о бизнесе: минимум 10 символов.", "error");
     const btn = $("botBtn");
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>Проверяем токен…';
     try {
-      await api("/api/bots", { method: "POST", body });
-      toast("Бот создан! Теперь нажмите «Запустить» в списке ниже.", "success");
+      if (platform === "instagram") {
+        const access_token = $("botIgToken").value.trim();
+        const app_id = $("botIgAppId").value.trim();
+        const app_secret = $("botIgSecret").value.trim();
+        if (access_token.length < 20) return toast("Вставьте токен из кабинета Meta — 3 разрешения, инструкция в подсказке над формой.", "error");
+        if (!app_id || !app_secret) return toast("Вставьте App ID и App Secret из настроек приложения Meta (Настройки приложения → Basic).", "error");
+        btn.innerHTML = '<span class="spinner"></span>Подключаем Instagram…';
+        await api("/api/bots/instagram", {
+          method: "POST",
+          body: { name, role, tone, knowledge, access_token, app_id, app_secret },
+        });
+        toast("Бот создан! Теперь нажмите «Запустить» в списке ниже.", "success");
+      } else {
+        const bot_token = $("botToken").value.trim();
+        if (!bot_token) return toast("Вставьте токен бота, полученный у @BotFather.", "error");
+        btn.innerHTML = '<span class="spinner"></span>Проверяем токен…';
+        await api("/api/bots", {
+          method: "POST",
+          body: { name, role, tone, knowledge, bot_token },
+        });
+        toast("Бот создан! Теперь нажмите «Запустить» в списке ниже.", "success");
+      }
       $("botForm").reset();
       document.querySelectorAll("#roleChips .chip").forEach((c) => c.classList.remove("active"));
+      selectBotPlatform("telegram");
       loadBots();
     } catch (err) {
       toast(err.message, "error");

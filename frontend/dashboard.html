@@ -241,15 +241,31 @@
 
       <!-- Вкладка: ИИ-боты -->
       <div id="tab-bots" class="autotab-pane mt-5 hidden">
-        <details class="rounded-xl border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
-          <summary class="cursor-pointer font-medium">Как это работает? 2 простых шага</summary>
-          <ol class="mt-2 list-decimal space-y-1 pl-5 text-slate-400">
-            <li>Создайте бота у <span class="font-mono text-slate-300">@BotFather</span> (команда <span class="font-mono text-slate-300">/newbot</span>) и скопируйте токен.</li>
-            <li>Опишите ниже роль и знания бота, нажмите «Создать», затем «Запустить» — бот начнёт отвечать клиентам в Telegram: задаёт вопросы, консультирует и записывает заявки.</li>
-          </ol>
-        </details>
+        <div id="botTgHint" class="rounded-xl border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
+          <details>
+            <summary class="cursor-pointer font-medium">Как это работает? 2 простых шага</summary>
+            <ol class="mt-2 list-decimal space-y-1 pl-5 text-slate-400">
+              <li>Создайте бота у <span class="font-mono text-slate-300">@BotFather</span> (команда <span class="font-mono text-slate-300">/newbot</span>) и скопируйте токен.</li>
+              <li>Опишите ниже роль и знания бота, нажмите «Создать», затем «Запустить» — бот начнёт отвечать клиентам в Telegram: задаёт вопросы, консультирует и записывает заявки.</li>
+            </ol>
+          </details>
+        </div>
+
+        <div id="botIgHint" class="hidden rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/10 p-3 text-sm text-fuchsia-100">
+          Бот отвечает клиентам в Direct вашего Instagram. Нужен токен из кабинета Meta
+          (дополнительно отметьте разрешение <span class="font-mono">instagram_business_manage_messages</span>) и App ID с App Secret.
+          <a href="instagram-setup.html#bots" target="_blank" class="font-semibold text-fuchsia-300 underline hover:text-fuchsia-200">Пошаговая инструкция →</a>
+        </div>
 
         <form id="botForm" class="mt-4 space-y-4">
+          <div>
+            <span class="mb-1 block text-sm font-medium text-slate-300">Где отвечает бот</span>
+            <div id="botPlatformChips" class="flex flex-wrap gap-2">
+              <button type="button" class="chip active" data-v="telegram">Telegram</button>
+              <button type="button" class="chip" data-v="instagram">Instagram Direct</button>
+            </div>
+            <input type="hidden" id="botPlatform" value="telegram">
+          </div>
           <div class="grid gap-4 md:grid-cols-2">
             <div>
               <label for="botName" class="mb-1 block text-sm font-medium text-slate-300">Имя бота</label>
@@ -270,7 +286,7 @@
             <div id="roleChips" class="flex flex-wrap gap-2">
               <button type="button" class="chip" data-v="Менеджер по продажам">Менеджер по продажам</button>
               <button type="button" class="chip" data-v="Поддержка клиентов">Поддержка клиентов</button>
-              <button type="button" class="chip" data-v="Запись клиентов на услуги">Запись на услуги</button>
+              <button type="button" class="chip" data-v="Запись клиентов на услуги">Запись клиентов на услуги</button>
               <button type="button" class="chip" data-v="Консультант по товарам">Консультант по товарам</button>
               <button type="button" class="chip" data-v="Приём заявок и заказов">Приём заявок и заказов</button>
             </div>
@@ -280,9 +296,25 @@
             <label for="botKnowledge" class="mb-1 block text-sm font-medium text-slate-300">Что бот должен знать о вашем бизнесе</label>
             <textarea id="botKnowledge" class="field" rows="4" maxlength="4000" placeholder="Товары и цены: торты от 1500 ₽, хлеб 90 ₽&#10;Адрес и время работы: Казань, ул. Баумана 1, ежедневно 8:00–20:00&#10;Контакты: телефон +7 900 000-00-00"></textarea>
           </div>
-          <div>
+          <div id="botTgTokenField">
             <label for="botToken" class="mb-1 block text-sm font-medium text-slate-300">Токен бота (от @BotFather)</label>
             <input id="botToken" class="field" maxlength="100" autocomplete="off" placeholder="123456789:AA...">
+          </div>
+          <div id="botIgFields" class="hidden space-y-3 rounded-xl border border-white/10 bg-slate-950/40 p-4">
+            <div>
+              <label for="botIgToken" class="mb-1 block text-sm font-medium text-slate-300">Токен Instagram (3 разрешения, см. инструкцию)</label>
+              <textarea id="botIgToken" class="field font-mono text-xs" rows="3" maxlength="600" autocomplete="off" placeholder="IGAAK…"></textarea>
+            </div>
+            <div class="grid gap-3 md:grid-cols-2">
+              <div>
+                <label for="botIgAppId" class="mb-1 block text-sm font-medium text-slate-300">App ID</label>
+                <input id="botIgAppId" class="field" maxlength="64" autocomplete="off" placeholder="123456789012345">
+              </div>
+              <div>
+                <label for="botIgSecret" class="mb-1 block text-sm font-medium text-slate-300">App Secret</label>
+                <input id="botIgSecret" type="password" class="field" maxlength="128" autocomplete="off" placeholder="32 символа">
+              </div>
+            </div>
           </div>
           <div>
             <button id="botBtn" type="submit" class="rounded-xl bg-indigo-600 px-4 py-2.5 font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60">Создать бота</button>
