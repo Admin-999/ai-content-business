@@ -102,7 +102,7 @@ async function generate(e) {
   const btn = $("genBtn");
   const original = btn.textContent;
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Генерируем… 10–30 секунд';
+  btn.innerHTML = '<span class="spinner"></span>Генерируем… до минуты';
 
   try {
     const data = await api("/api/generate", {
@@ -188,6 +188,8 @@ function showPayError(msg) {
 // --- Инициализация ---
 (function init() {
   if (!requireAuth()) return;
+
+  warmBackend();
 
   $("userEmail").textContent = localStorage.getItem("ac_email") || "";
 

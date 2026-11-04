@@ -42,8 +42,8 @@ image = (
     secrets=[modal.Secret.from_name("ai-content-secrets"), modal.Secret.from_name("telegram-bot")],
     max_containers=1,
     cpu=0.5,
-    memory=2048,
-    scaledown_window=900,
+    memory=1024,
+    scaledown_window=1800,
     volumes={"/data": volume},
 )
 @modal.asgi_app()

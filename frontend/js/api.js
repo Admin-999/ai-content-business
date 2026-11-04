@@ -12,7 +12,7 @@ function toast(message, type = "info") {
   toastTimer = setTimeout(() => { el.className = ""; }, 4500);
 }
 
-async function api(path, { method = "GET", body = null, auth = true } = {}) {
+async function api(path, { method = "GET", body = null, auth = true, retry = method === "GET" } = {}) {
   const headers = { "Content-Type": "application/json" };
   const token = localStorage.getItem("ac_token");
   if (auth && token) headers["Authorization"] = "Bearer " + token;
@@ -21,6 +21,10 @@ async function api(path, { method = "GET", body = null, auth = true } = {}) {
   try {
     resp = await fetch(API_URL + path, { method, headers, body: body ? JSON.stringify(body) : null });
   } catch (e) {
+    if (retry) {
+      await new Promise((r) => setTimeout(r, 1500));
+      return api(path, { method, body, auth, retry: false });
+    }
     throw new Error("Сервер не отвечает — возможно, он просыпается после паузы. Подождите минуту и нажмите кнопку ещё раз.");
   }
 
@@ -37,6 +41,12 @@ async function api(path, { method = "GET", body = null, auth = true } = {}) {
 
   if (!resp.ok) throw new Error((data && data.detail) || "Ошибка сервера (" + resp.status + ")");
   return data;
+}
+
+function warmBackend() {
+  try {
+    fetch(API_URL + "/api/health", { method: "GET" }).catch(() => {});
+  } catch (e) {}
 }
 
 async function copyText(text) {

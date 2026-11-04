@@ -711,6 +711,7 @@ async function apiForm(path, formData) {
   });
 
   // ===== Старт =====
+  warmBackend();
   loadChannelSetup();
   loadChannels();
   loadMpAccounts();
