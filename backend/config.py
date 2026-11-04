@@ -70,6 +70,9 @@ IG_CARDS_DIR = os.getenv("IG_CARDS_DIR", "/data/ig_cards" if os.path.isdir("/dat
 MP_PHOTOS_DIR = os.getenv("MP_PHOTOS_DIR", "/data/mp_photos" if os.path.isdir("/data") else "./mp_photos")
 # Кэш дерева категорий Ozon (обновляется раз в неделю, файл может быть на десятки МБ)
 OZON_CACHE = os.getenv("OZON_CACHE", "/data/ozon_categories.json" if os.path.isdir("/data") else "./ozon_categories.json")
+# Шлюз API AliExpress (протокол TOP): глобальный api-sg.aliexpress.com проверен и отвечает;
+# при необходимости можно переопределить другим регионом через переменную окружения
+ALIEXPRESS_GATEWAY = os.getenv("ALIEXPRESS_GATEWAY", "https://api-sg.aliexpress.com/sync").rstrip("/")
 # Публичный адрес этого backend, по нему Telegram шлёт обновления ИИ-ботов
 BACKEND_URL = os.getenv(
     "BACKEND_URL", "https://vsvolodin2014--ai-content-api-api.us-east.modal.run"

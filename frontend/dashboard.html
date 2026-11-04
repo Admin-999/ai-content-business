@@ -202,7 +202,7 @@
           <ol class="mt-2 list-decimal space-y-1 pl-5 text-slate-400">
             <li>Выберите маркетплейс, загрузите фото товара, напишите название и цену — ИИ рассмотрит фото и составит описание, характеристики и ключевые слова под требования площадки.</li>
             <li>Для Wildberries, Ozon и Яндекс Маркета можно подключить кабинет продавца ниже — тогда карточка опубликуется сама.</li>
-            <li>Для AliExpress карточка будет готова в один клик: скопируйте её и вставьте в кабинет магазина.</li>
+            <li>Для AliExpress нужны ключи приложения из AliExpress Open Platform; без них карточка готова к копированию в один клик.</li>
           </ol>
         </details>
 
@@ -250,9 +250,19 @@
           <p id="ymStatusText" class="mt-2 text-xs text-slate-400">Ключ создаётся в кабинете Маркета: Настройки → API-ключи.</p>
         </div>
 
-        <p id="mpManualHint" class="mt-4 hidden rounded-xl border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
-          Для AliExpress карточка будет готова — скопируйте её одной кнопкой и вставьте в кабинет магазина. Токены не нужны.
-        </p>
+        <div id="aliStoreBox" class="mt-4 hidden rounded-xl border border-white/10 bg-slate-950/40 p-4">
+          <h3 class="text-sm font-semibold">Магазин AliExpress</h3>
+          <div class="mt-2 grid gap-3 md:grid-cols-3">
+            <input id="aliKey" type="password" class="field" maxlength="100" autocomplete="off" placeholder="app_key из Open Platform">
+            <input id="aliSecret" type="password" class="field" maxlength="200" autocomplete="off" placeholder="app_secret из Open Platform">
+            <input id="aliToken" type="password" class="field" maxlength="600" autocomplete="off" placeholder="access_token продавца">
+          </div>
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            <button id="aliConnectBtn" type="button" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-60">Подключить</button>
+            <button id="aliDisconnectBtn" type="button" class="hidden rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-300 hover:bg-white/10">Отключить</button>
+          </div>
+          <p id="aliStatusText" class="mt-2 text-xs text-slate-400">Ключи берутся в AliExpress Open Platform: приложение с доступом к товарам (app_key, app_secret) и access_token продавца. Без них карточку можно просто скопировать.</p>
+        </div>
 
         <form id="wbCardForm" class="mt-4 grid gap-4 md:grid-cols-3">
           <div>

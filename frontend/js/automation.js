@@ -257,16 +257,15 @@ async function apiForm(path, formData) {
 
   // ===== Маркетплейсы (Wildberries, Ozon, AliExpress, Яндекс Маркет) =====
   const MP_NAMES = { wb: "Wildberries", ozon: "Ozon", aliexpress: "AliExpress", yamarket: "Яндекс Маркет" };
-  const MP_BOXES = { wb: "wbStoreBox", ozon: "ozonStoreBox", yamarket: "ymStoreBox", aliexpress: null };
+  const MP_BOXES = { wb: "wbStoreBox", ozon: "ozonStoreBox", yamarket: "ymStoreBox", aliexpress: "aliStoreBox" };
   const mpChips = Array.from(document.querySelectorAll("#mpChips .chip"));
 
   function selectMarketplace(name) {
     mpChips.forEach((c) => c.classList.toggle("active", c.dataset.v === name));
     $("wbPlatform").value = name;
     for (const key of Object.keys(MP_BOXES)) {
-      if (MP_BOXES[key]) $(MP_BOXES[key]).classList.toggle("hidden", key !== name);
+      $(MP_BOXES[key]).classList.toggle("hidden", key !== name);
     }
-    $("mpManualHint").classList.toggle("hidden", name !== "aliexpress");
   }
   mpChips.forEach((chip) => chip.addEventListener("click", () => selectMarketplace(chip.dataset.v)));
 
@@ -297,6 +296,12 @@ async function apiForm(path, formData) {
         "ym",
         !!(by.yamarket && by.yamarket.connected),
         "Магазин Маркета подключён. Новые карточки будут публиковаться автоматически.",
+        "Магазин не подключён: карточки будут создаваться, но публиковать их придётся вручную."
+      );
+      setStoreStatus(
+        "ali",
+        !!(by.aliexpress && by.aliexpress.connected),
+        "Магазин AliExpress подключён. Новые карточки будут публиковаться автоматически.",
         "Магазин не подключён: карточки будут создаваться, но публиковать их придётся вручную."
       );
     } catch (err) {
@@ -362,7 +367,33 @@ async function apiForm(path, formData) {
     }
   });
 
-  for (const [prefix, platform] of [["wb", "wb"], ["ozon", "ozon"], ["ym", "yamarket"]]) {
+  $("aliConnectBtn").addEventListener("click", async () => {
+    const appKey = $("aliKey").value.trim();
+    const appSecret = $("aliSecret").value.trim();
+    const accessToken = $("aliToken").value.trim();
+    if (appKey.length < 4 || appSecret.length < 8 || accessToken.length < 10) {
+      return toast("Вставьте app_key, app_secret и access_token из AliExpress Open Platform.", "error");
+    }
+    const btn = $("aliConnectBtn");
+    connectBtnState(btn, true, "Проверяем ключи…", "Подключить");
+    try {
+      await api("/api/wb/connect", {
+        method: "POST",
+        body: { platform: "aliexpress", app_key: appKey, app_secret: appSecret, access_token: accessToken },
+      });
+      toast("AliExpress подключён!", "success");
+      $("aliKey").value = "";
+      $("aliSecret").value = "";
+      $("aliToken").value = "";
+      loadMpAccounts();
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      connectBtnState(btn, false, "", "Подключить");
+    }
+  });
+
+  for (const [prefix, platform] of [["wb", "wb"], ["ozon", "ozon"], ["ym", "yamarket"], ["ali", "aliexpress"]]) {
     $(prefix + "DisconnectBtn").addEventListener("click", async () => {
       try {
         await api("/api/wb/account/" + platform, { method: "DELETE" });

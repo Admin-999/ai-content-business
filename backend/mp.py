@@ -16,7 +16,7 @@ import time
 
 import httpx
 
-from config import BACKEND_URL, MP_PHOTOS_DIR, OZON_CACHE
+from config import ALIEXPRESS_GATEWAY, BACKEND_URL, MP_PHOTOS_DIR, OZON_CACHE
 
 OZON_API = "https://api-seller.ozon.ru"
 YM_API = "https://api.partner.market.yandex.ru"
@@ -243,3 +243,117 @@ def yamarket_publish(token: str, campaign_id: int, photo_url: str, name: str, pr
         if resp is not None and resp.status_code not in (200, 201, 204):
             raise MarketplaceError(f"Карточка создана, но цена не обновилась: HTTP {resp.status_code}: {resp.text[:200]}")
     return f"артикул: {sku}"
+
+
+# ===== AliExpress (протокол TOP: подпись MD5, приложение из Open Platform) =====
+
+def _ali_sign(params: dict, secret: str) -> str:
+    src = secret + "".join(k + str(params[k]) for k in sorted(params)) + secret
+    return hashlib.md5(src.encode("utf-8")).hexdigest().upper()
+
+
+def _ali_call(app_key: str, app_secret: str, access_token: str, method: str, api_params: dict = None, files: dict = None) -> dict:
+    """POST на шлюз AliExpress с обязательной подписью запроса."""
+    params = {
+        "method": method,
+        "app_key": app_key,
+        "session": access_token,
+        "timestamp": str(int(time.time() * 1000)),
+        "format": "JSON",
+        "v": "2.0",
+        "sign_method": "md5",
+    }
+    params.update({k: str(v) for k, v in (api_params or {}).items()})
+    params["sign"] = _ali_sign(params, app_secret)
+    try:
+        with httpx.Client(timeout=MP_TIMEOUT) as client:
+            if files:
+                resp = client.post(ALIEXPRESS_GATEWAY, data=params, files=files)
+            else:
+                resp = client.post(ALIEXPRESS_GATEWAY, data=params)
+    except httpx.HTTPError as e:
+        raise MarketplaceError(f"AliExpress недоступен: {e}")
+    try:
+        data = resp.json()
+    except ValueError:
+        raise MarketplaceError(f"AliExpress: неожиданный ответ HTTP {resp.status_code}: {resp.text[:200]}")
+    if isinstance(data, dict) and "error_response" in data:
+        err = data["error_response"] or {}
+        msg = " ".join(str(err.get(k)) for k in ("msg", "sub_msg") if err.get(k)).strip()
+        raise MarketplaceError(f"AliExpress отклонил запрос: {msg[:220] or resp.text[:220]}")
+    return data
+
+
+def _ali_find(obj, keys: tuple):
+    """Рекурсивно ищет первое непустое значение по списку имён ключей (ответы AliExpress глубоко вложены)."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k in keys and v not in (None, "", [], {}):
+                return v
+        for v in obj.values():
+            found = _ali_find(v, keys)
+            if found is not None:
+                return found
+    elif isinstance(obj, list):
+        for item in obj:
+            found = _ali_find(item, keys)
+            if found is not None:
+                return found
+    return None
+
+
+def aliexpress_validate(app_key: str, app_secret: str, access_token: str) -> None:
+    """Проверяет ключи приложения дешёвым запросом рекомендованных категорий."""
+    _ali_call(app_key, app_secret, access_token, "aliexpress.category.recommendfun.get", {"title": "test"})
+
+
+def aliexpress_upload_photo(app_key: str, app_secret: str, access_token: str, photo_bytes: bytes, mime: str) -> str:
+    """Загружает фото в фотобанк продавца и возвращает публичный URL AliExpress."""
+    ext = PHOTO_MIME.get(mime, "jpg")
+    data = _ali_call(
+        app_key, app_secret, access_token,
+        "aliexpress.photobank.image.upload",
+        {},
+        files={"image": (f"item.{ext}", photo_bytes, mime)},
+    )
+    url = _ali_find(data, ("url", "image_url", "image_full_path", "full_image_url"))
+    if not isinstance(url, str) or not url.startswith("http"):
+        raise MarketplaceError("AliExpress не вернул адрес загруженного фото.")
+    return url
+
+
+def aliexpress_pick_category(app_key: str, app_secret: str, access_token: str, name: str):
+    data = _ali_call(
+        app_key, app_secret, access_token,
+        "aliexpress.category.recommendfun.get",
+        {"title": name[:50]},
+    )
+    cats = _ali_find(data, ("result_list", "category_list", "categories", "list"))
+    if not isinstance(cats, list) or not cats:
+        raise MarketplaceError("Не удалось подобрать категорию товара в AliExpress.")
+    cat_id = _ali_find(cats[0], ("category_id", "cat_id", "id"))
+    if not cat_id:
+        raise MarketplaceError("Не удалось подобрать категорию товара в AliExpress.")
+    return cat_id
+
+
+def aliexpress_publish(creds: dict, photo_bytes: bytes, mime: str, name: str, price: int, card: dict) -> str:
+    """Публикует товар через Open Platform: фотобанк -> категория -> карточка."""
+    app_key, app_secret, token = creds["app_key"], creds["app_secret"], creds["access_token"]
+    image_url = aliexpress_upload_photo(app_key, app_secret, token, photo_bytes, mime)
+    cat_id = aliexpress_pick_category(app_key, app_secret, token, name)
+    keywords = ", ".join([w.strip() for w in (card.get("keywords") or "").split(",") if w.strip()][:3])
+    product = {
+        "subject": name[:128],
+        "image_urls": [image_url],
+        "product_units": [{"price": str(price), "sku_id": "default"}],
+        "keyword_product": keywords[:128],
+        "description": (card.get("description") or "")[:3000],
+    }
+    data = _ali_call(
+        app_key, app_secret, token,
+        "aliexpress.solution.open.product.publish",
+        {"product": json.dumps(product, ensure_ascii=False), "cat_id": str(cat_id)},
+    )
+    product_id = _ali_find(data, ("product_id", "productId"))
+    return f"ID товара: {product_id}" if product_id else "отправлена в AliExpress"

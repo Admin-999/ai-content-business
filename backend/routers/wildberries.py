@@ -49,7 +49,7 @@ MARKETPLACES = {
     },
     "aliexpress": {
         "name": "AliExpress",
-        "auto": False,
+        "auto": True,
         "persona": "Ты — специалист по карточкам товаров AliExpress с опытом 10 лет.",
         "description": "простое продающее описание 300–600 символов короткими фразами, без указания цены",
         "characters": "6–10 шт.",
@@ -71,6 +71,9 @@ class WBConnectIn(BaseModel):
     api_token: str = ""
     client_id: str = ""
     api_key: str = ""
+    app_key: str = ""
+    app_secret: str = ""
+    access_token: str = ""
 
 
 class WBError(Exception):
@@ -193,11 +196,6 @@ def wb_connect(body: WBConnectIn, user: dict = Depends(get_current_user)):
     platform = (body.platform or "wb").strip().lower()
     if platform not in MARKETPLACES:
         raise HTTPException(status_code=422, detail="Неизвестный маркетплейс.")
-    if not MARKETPLACES[platform]["auto"]:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Автопубликация в {MARKETPLACES[platform]['name']} пока не поддерживается — карточка создаётся готовой к ручной вставке.",
-        )
 
     if platform == "wb":
         token = body.api_token.strip()
@@ -224,7 +222,7 @@ def wb_connect(body: WBConnectIn, user: dict = Depends(get_current_user)):
                 detail=f"{e} Ключи создаются в кабинете Ozon: Настройки -> API-ключи (доступ «Продукты»).",
             )
         creds, extra = json.dumps({"client_id": client_id, "api_key": api_key}), None
-    else:
+    elif platform == "yamarket":
         token = body.api_token.strip()
         if len(token) < 10:
             raise HTTPException(status_code=422, detail="Вставьте API-ключ кабинета Яндекс Маркета.")
@@ -236,7 +234,25 @@ def wb_connect(body: WBConnectIn, user: dict = Depends(get_current_user)):
                 detail=f"{e} Ключ создаётся в кабинете Маркета: Настройки -> API-ключи.",
             )
         creds, extra = token, json.dumps({"campaign_id": campaign_id})
-
+    else:
+        app_key = body.app_key.strip()
+        app_secret = body.app_secret.strip()
+        access_token = body.access_token.strip()
+        if len(app_key) < 4 or len(app_secret) < 8 or len(access_token) < 10:
+            raise HTTPException(
+                status_code=422,
+                detail="Вставьте app_key, app_secret и access_token приложения из AliExpress Open Platform.",
+            )
+        try:
+            mp.aliexpress_validate(app_key, app_secret, access_token)
+        except mp.MarketplaceError as e:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{e} Ключи берутся в кабинете разработчика AliExpress Open Platform (приложение с доступом к товарам).",
+            )
+        creds, extra = json.dumps(
+            {"app_key": app_key, "app_secret": app_secret, "access_token": access_token}
+        ), None
     database.execute(
         "DELETE FROM wb_accounts WHERE user_id = %s AND platform = %s",
         (user["id"], platform),
@@ -364,25 +380,29 @@ def create_card(
             except WBError as e:
                 status = "error"
                 error = str(e)[:300]
-    elif platform in ("ozon", "yamarket"):
+    elif platform in ("ozon", "yamarket", "aliexpress"):
         account = database.fetchone(
             "SELECT api_token, extra FROM wb_accounts WHERE user_id = %s AND platform = %s",
             (user["id"], platform),
         )
         if account:
             try:
-                photo_url = mp.save_photo(photo_bytes, mime)
                 if platform == "ozon":
                     creds = json.loads(account[0])
+                    photo_url = mp.save_photo(photo_bytes, mime)
                     subject = mp.ozon_publish(
                         creds["client_id"], creds["api_key"], photo_url, name, price_rub, card
                     )
-                else:
+                elif platform == "yamarket":
                     extra = json.loads(account[1] or "{}")
                     campaign_id = extra.get("campaign_id")
                     if not campaign_id:
                         raise mp.MarketplaceError("Магазин Маркета подключён без кампании — подключите его заново.")
+                    photo_url = mp.save_photo(photo_bytes, mime)
                     subject = mp.yamarket_publish(account[0], campaign_id, photo_url, name, price_rub, card)
+                else:
+                    creds = json.loads(account[0])
+                    subject = mp.aliexpress_publish(creds, photo_bytes, mime, name, price_rub, card)
                 status = "published"
             except (mp.MarketplaceError, ValueError) as e:
                 status = "error"
