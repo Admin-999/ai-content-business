@@ -19,7 +19,7 @@ jobs:
             echo "Не заданы секреты BACKEND_URL и/или CRON_SECRET (Settings -> Secrets and variables -> Actions)"
             exit 1
           fi
-          code=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+          code=$(curl -s --max-time 600 -o /tmp/resp.json -w "%{http_code}" \
             -X POST "$BACKEND_URL/api/cron/daily-report" \
             -H "X-Cron-Secret: $CRON_SECRET")
           echo "HTTP $code"

@@ -398,10 +398,13 @@ def autopost(x_cron_secret: str = Header(default="")):
                 status, error = "failed", str(e)
                 failed += 1
 
-        database.execute(
-            "INSERT INTO generations (id, user_id, topic, content_type, tone, language, result, model, created_at) "
-            "VALUES (%s, %s, %s, 'post', %s, 'ru', %s, %s, %s)",
-            (new_id(), uid, f"Автопостинг: {title}", tone, text, model, now),
-        )
+        if status == "sent":
+            # квота списывается только за фактически опубликованный пост:
+            # неудачные автопосты не должны расходовать дневной лимит
+            database.execute(
+                "INSERT INTO generations (id, user_id, topic, content_type, tone, language, result, model, created_at) "
+                "VALUES (%s, %s, %s, 'post', %s, 'ru', %s, %s, %s)",
+                (new_id(), uid, f"Автопостинг: {title}", tone, text, model, now),
+            )
         _log_post(cid, uid, text, status, error)
     return {"status": "ok", "checked": len(rows), "sent": sent, "failed": failed, "skipped": skipped}

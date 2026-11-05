@@ -4,6 +4,8 @@
 (OpenRouter, GitHub Models и любые другие). Работают те, у кого задан ключ.
 """
 import base64
+import logging
+import time
 
 import httpx
 
@@ -19,6 +21,12 @@ from config import (
 )
 
 TIMEOUT = httpx.Timeout(60.0)
+
+logger = logging.getLogger("app.ai")
+
+_RETRYABLE = {429, 500, 502, 503, 504}
+_RETRIES = 2
+_RETRY_PAUSE = 5.0
 
 CONTENT_TYPES = ("post", "article", "product")
 
@@ -83,52 +91,79 @@ def _chat_text(data: dict, label: str) -> str:
     return text
 
 
+def _friendly_error(label: str, status: int, body: str) -> str:
+    """Понятный текст ошибки вместо сырого JSON-ответа провайдера."""
+    if status == 429:
+        return f"{label}: превышен лимит запросов, попробуйте ещё раз через минуту."
+    if status in (401, 403):
+        return f"{label}: провайдер отклонил API-ключ."
+    if status in _RETRYABLE:
+        return f"{label}: провайдер временно недоступен, попробуйте ещё раз через минуту."
+    return f"{label}: ошибка {status} ({body})."
+
+
+def _post_llm(client: httpx.Client, label: str, url: str, headers: dict, payload: dict) -> dict:
+    """POST к провайдеру с автоматическим повтором на 429/5xx."""
+    for attempt in range(_RETRIES + 1):
+        resp = client.post(url, headers=headers, json=payload)
+        if resp.status_code == 200:
+            try:
+                return resp.json()
+            except ValueError:
+                raise AIError(f"{label} вернул нечитаемый ответ")
+        if resp.status_code in _RETRYABLE and attempt < _RETRIES:
+            logger.warning("%s HTTP %s — повтор %d из %d", label, resp.status_code, attempt + 1, _RETRIES)
+            time.sleep(_RETRY_PAUSE * (attempt + 1))
+            continue
+        raise AIError(_friendly_error(label, resp.status_code, resp.text[:150]))
+
+
 def _call_gemini(client: httpx.Client, prompt: str) -> str:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
-    resp = client.post(
+    data = _post_llm(
+        client,
+        "Gemini",
         url,
-        headers={"x-goog-api-key": GEMINI_API_KEY},
-        json={
+        {"x-goog-api-key": GEMINI_API_KEY},
+        {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.8, "maxOutputTokens": 2048},
         },
     )
-    if resp.status_code != 200:
-        raise AIError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}")
-    return _gemini_text(resp.json())
+    return _gemini_text(data)
 
 
 def _call_groq(client: httpx.Client, prompt: str) -> str:
-    resp = client.post(
+    data = _post_llm(
+        client,
+        "Groq",
         "https://api.groq.com/openai/v1/chat/completions",
-        headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-        json={
+        {"Authorization": f"Bearer {GROQ_API_KEY}"},
+        {
             "model": GROQ_MODEL,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.8,
             "max_tokens": 2048,
         },
     )
-    if resp.status_code != 200:
-        raise AIError(f"Groq HTTP {resp.status_code}: {resp.text[:200]}")
-    return _chat_text(resp.json(), "Groq")
+    return _chat_text(data, "Groq")
 
 
 def _call_openai_compat(client: httpx.Client, prompt: str) -> str:
     """Любой OpenAI-совместимый провайдер: OpenRouter, GitHub Models и т.п."""
-    resp = client.post(
+    data = _post_llm(
+        client,
+        "AI-провайдер",
         f"{OPENAI_COMPAT_BASE_URL}/chat/completions",
-        headers={"Authorization": f"Bearer {OPENAI_COMPAT_API_KEY}"},
-        json={
+        {"Authorization": f"Bearer {OPENAI_COMPAT_API_KEY}"},
+        {
             "model": OPENAI_COMPAT_MODEL,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.8,
             "max_tokens": 2048,
         },
     )
-    if resp.status_code != 200:
-        raise AIError(f"AI HTTP {resp.status_code}: {resp.text[:200]}")
-    return _chat_text(resp.json(), "AI-провайдер")
+    return _chat_text(data, "AI-провайдер")
 
 
 def _text_providers(prompt: str):
@@ -175,10 +210,12 @@ def chat_text(system: str, user: str):
 
 def _vision_gemini(client: httpx.Client, prompt: str, b64: str, mime: str) -> str:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
-    resp = client.post(
+    data = _post_llm(
+        client,
+        "Gemini",
         url,
-        headers={"x-goog-api-key": GEMINI_API_KEY},
-        json={
+        {"x-goog-api-key": GEMINI_API_KEY},
+        {
             "contents": [{"parts": [
                 {"text": prompt},
                 {"inline_data": {"mime_type": mime, "data": b64}},
@@ -186,16 +223,16 @@ def _vision_gemini(client: httpx.Client, prompt: str, b64: str, mime: str) -> st
             "generationConfig": {"temperature": 0.4, "maxOutputTokens": 2048},
         },
     )
-    if resp.status_code != 200:
-        raise AIError(f"Gemini HTTP {resp.status_code}: {resp.text[:200]}")
-    return _gemini_text(resp.json())
+    return _gemini_text(data)
 
 
 def _vision_groq(client: httpx.Client, prompt: str, b64: str, mime: str) -> str:
-    resp = client.post(
+    data = _post_llm(
+        client,
+        "Groq",
         "https://api.groq.com/openai/v1/chat/completions",
-        headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-        json={
+        {"Authorization": f"Bearer {GROQ_API_KEY}"},
+        {
             "model": GROQ_VISION_MODEL,
             "messages": [{"role": "user", "content": [
                 {"type": "text", "text": prompt},
@@ -205,9 +242,7 @@ def _vision_groq(client: httpx.Client, prompt: str, b64: str, mime: str) -> str:
             "max_tokens": 2048,
         },
     )
-    if resp.status_code != 200:
-        raise AIError(f"Groq HTTP {resp.status_code}: {resp.text[:200]}")
-    return _chat_text(resp.json(), "Groq")
+    return _chat_text(data, "Groq")
 
 
 def describe_image(image_bytes: bytes, mime: str, prompt: str):
