@@ -1,10 +1,11 @@
-"""Регистрация и вход.
+"""Регистрация, вход и профиль пользователя.
 
 Пароли хранятся в виде bcrypt-хешей, сессия — JWT в localStorage на фронтенде.
 Выбор в пользу собственной JWT-авторизации (вместо Supabase Auth): не нужно
 подтверждение email и настройка редиректов, MVP работает сразу из коробки.
 """
 import re
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -26,6 +27,17 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     email: str
     password: str
+
+
+# Аватар хранится прямо в БД как data URL (PNG/JPEG/WebP, ~до 350 КБ бинарно)
+AVATAR_RE = re.compile(r"^data:image/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$")
+AVATAR_MAX_CHARS = 500_000
+
+
+class ProfileIn(BaseModel):
+    # None — поле не менять, "" — очистить
+    name: Optional[str] = Field(default=None, max_length=60)
+    avatar: Optional[str] = None
 
 
 @router.post("/register")
@@ -72,3 +84,38 @@ def me(user: dict = Depends(get_current_user)):
         "plan": user["plan"],
         "plan_expires_at": user["plan_expires_at"].isoformat() if user["plan_expires_at"] else None,
     }
+
+
+@router.get("/profile")
+def get_profile(user: dict = Depends(get_current_user)):
+    row = database.fetchone("SELECT name, avatar FROM users WHERE id = %s", (user["id"],))
+    name, avatar = (row[0], row[1]) if row else (None, None)
+    return {"email": user["email"], "name": name, "avatar": avatar}
+
+
+@router.patch("/profile")
+def update_profile(body: ProfileIn, user: dict = Depends(get_current_user)):
+    row = database.fetchone("SELECT name, avatar FROM users WHERE id = %s", (user["id"],))
+    name, avatar = (row[0], row[1]) if row else (None, None)
+
+    if body.name is not None:
+        name = body.name.strip() or None
+    if body.avatar is not None:
+        avatar = body.avatar or None
+        if avatar:
+            if len(avatar) > AVATAR_MAX_CHARS:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Файл аватара слишком большой. Выберите изображение поменьше.",
+                )
+            if not AVATAR_RE.match(avatar):
+                raise HTTPException(
+                    status_code=422,
+                    detail="Аватар должен быть изображением PNG, JPEG или WebP.",
+                )
+
+    database.execute(
+        "UPDATE users SET name = %s, avatar = %s WHERE id = %s",
+        (name, avatar, user["id"]),
+    )
+    return {"email": user["email"], "name": name, "avatar": avatar, "message": "Профиль сохранён."}

@@ -26,7 +26,9 @@ DDL = [
         password_hash TEXT NOT NULL,
         plan TEXT NOT NULL DEFAULT 'free',
         plan_expires_at TIMESTAMPTZ,
-        created_at TIMESTAMPTZ NOT NULL
+        created_at TIMESTAMPTZ NOT NULL,
+        name TEXT,
+        avatar TEXT
     )""",
     """CREATE TABLE IF NOT EXISTS generations (
         id TEXT PRIMARY KEY,
@@ -232,6 +234,11 @@ _WB_ACCOUNT_COLUMNS = (
     ("platform", "TEXT NOT NULL DEFAULT 'wb'"),
     ("extra", "TEXT"),
 )
+# Профиль: имя и аватар (data URL) добавляются миграцией к базам, созданным до этой версии
+_USER_PROFILE_COLUMNS = (
+    ("name", "TEXT"),
+    ("avatar", "TEXT"),
+)
 
 
 def _add_missing_columns(table: str, columns) -> None:
@@ -255,6 +262,7 @@ def init_db() -> None:
     """Таблицы создаются автоматически при старте — sql/schema.sql нужен только для ручной инициализации."""
     for ddl in DDL:
         execute(ddl)
+    _add_missing_columns("users", _USER_PROFILE_COLUMNS)
     _add_missing_columns("channels", _IG_CHANNEL_COLUMNS)
     _add_missing_columns("bots", _IG_BOT_COLUMNS)
     _add_missing_columns("wb_cards", _WB_CARD_COLUMNS)

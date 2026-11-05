@@ -185,6 +185,144 @@ function showPayError(msg) {
   $("payError").classList.remove("hidden");
 }
 
+// --- Профиль: имя и аватар ---
+let currentAvatar = null;
+let pendingAvatar; // undefined — не трогали, null — удалить, строка — новый data URL
+
+function renderHeaderProfile(name, avatar) {
+  const email = localStorage.getItem("ac_email") || "";
+  const letter = (name || email || "AI").charAt(0).toUpperCase();
+  $("profileName").textContent = name || "";
+  $("profileName").classList.toggle("hidden", !name);
+  $("avatarFallback").textContent = letter;
+  if (avatar) {
+    $("avatarImg").src = avatar;
+    $("avatarImg").classList.remove("hidden");
+    $("avatarFallback").classList.add("hidden");
+  } else {
+    $("avatarImg").removeAttribute("src");
+    $("avatarImg").classList.add("hidden");
+    $("avatarFallback").classList.remove("hidden");
+  }
+}
+
+function applyProfilePreview() {
+  const shown = pendingAvatar === undefined ? currentAvatar : pendingAvatar;
+  if (shown) {
+    $("pfAvatarPreview").src = shown;
+    $("pfAvatarPreview").classList.remove("hidden");
+    $("pfAvatarFallback").classList.add("hidden");
+  } else {
+    $("pfAvatarPreview").classList.add("hidden");
+    $("pfAvatarFallback").classList.remove("hidden");
+  }
+  $("pfAvatarRemove").classList.toggle("hidden", !shown);
+}
+
+async function loadProfile() {
+  const cachedName = localStorage.getItem("ac_name");
+  const cachedAvatar = localStorage.getItem("ac_avatar");
+  if (cachedName || cachedAvatar) {
+    currentAvatar = cachedAvatar || null;
+    renderHeaderProfile(cachedName, cachedAvatar);
+  }
+  try {
+    const p = await api("/api/auth/profile");
+    currentAvatar = p.avatar || null;
+    renderHeaderProfile(p.name, p.avatar);
+    localStorage.setItem("ac_name", p.name || "");
+    localStorage.setItem("ac_avatar", p.avatar || "");
+  } catch (err) {
+    // Профиль — некритичная часть шапки, не мешаем тостами
+  }
+}
+
+function openProfile() {
+  $("pfName").value = $("profileName").textContent || "";
+  $("pfAvatarFallback").textContent = $("avatarFallback").textContent;
+  pendingAvatar = undefined;
+  $("profileError").classList.add("hidden");
+  applyProfilePreview();
+  $("profileModal").classList.remove("hidden");
+  $("profileModal").classList.add("flex");
+}
+
+function closeProfile() {
+  $("profileModal").classList.add("hidden");
+  $("profileModal").classList.remove("flex");
+}
+
+function shrinkImage(file, done) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const SIZE = 256;
+      const canvas = document.createElement("canvas");
+      canvas.width = SIZE;
+      canvas.height = SIZE;
+      const ctx = canvas.getContext("2d");
+      const scale = Math.max(SIZE / img.width, SIZE / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      ctx.drawImage(img, (SIZE - w) / 2, (SIZE - h) / 2, w, h);
+      done(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => toast("Не удалось прочитать изображение.", "error");
+    img.src = reader.result;
+  };
+  reader.onerror = () => toast("Не удалось прочитать файл.", "error");
+  reader.readAsDataURL(file);
+}
+
+function onAvatarFile() {
+  const input = $("pfAvatarInput");
+  const file = input.files && input.files[0];
+  input.value = "";
+  if (!file) return;
+  if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) {
+    toast("Поддерживаются PNG, JPEG и WebP.", "error");
+    return;
+  }
+  shrinkImage(file, (dataUrl) => {
+    pendingAvatar = dataUrl;
+    applyProfilePreview();
+  });
+}
+
+function removeAvatar() {
+  pendingAvatar = null;
+  applyProfilePreview();
+}
+
+async function saveProfile(e) {
+  e.preventDefault();
+  const errEl = $("profileError");
+  errEl.classList.add("hidden");
+  const body = { name: $("pfName").value.trim() };
+  if (pendingAvatar !== undefined) body.avatar = pendingAvatar === null ? "" : pendingAvatar;
+
+  const btn = $("pfSaveBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Сохраняем…';
+  try {
+    const p = await api("/api/auth/profile", { method: "PATCH", body });
+    currentAvatar = p.avatar || null;
+    pendingAvatar = undefined;
+    renderHeaderProfile(p.name, p.avatar);
+    localStorage.setItem("ac_name", p.name || "");
+    localStorage.setItem("ac_avatar", p.avatar || "");
+    closeProfile();
+    toast("Профиль сохранён", "success");
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Сохранить";
+  }
+}
+
 // --- Инициализация ---
 (function init() {
   if (!requireAuth()) return;
@@ -197,8 +335,17 @@ function showPayError(msg) {
   $("logoutBtn").addEventListener("click", () => {
     localStorage.removeItem("ac_token");
     localStorage.removeItem("ac_email");
+    localStorage.removeItem("ac_name");
+    localStorage.removeItem("ac_avatar");
     location.href = "index.html";
   });
+  $("profileBtn").addEventListener("click", openProfile);
+  $("pfClose").addEventListener("click", closeProfile);
+  $("profileModal").addEventListener("click", (e) => { if (e.target === $("profileModal")) closeProfile(); });
+  $("pfAvatarPick").addEventListener("click", () => $("pfAvatarInput").click());
+  $("pfAvatarInput").addEventListener("change", onAvatarFile);
+  $("pfAvatarRemove").addEventListener("click", removeAvatar);
+  $("pfForm").addEventListener("submit", saveProfile);
   $("copyBtn").addEventListener("click", async () => {
     const ok = await copyText($("resultText").textContent);
     toast(ok ? "Скопировано в буфер обмена" : "Не удалось скопировать", ok ? "success" : "error");
@@ -222,6 +369,7 @@ function showPayError(msg) {
 
   loadUsage();
   loadHistory();
+  loadProfile();
 
   // Открытие модалки оплаты по прямой ссылке dashboard.html#upgrade (с лендинга)
   if (location.hash === "#upgrade") {
