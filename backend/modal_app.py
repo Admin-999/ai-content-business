@@ -39,7 +39,11 @@ image = (
 
 @app.function(
     image=image,
-    secrets=[modal.Secret.from_name("ai-content-secrets"), modal.Secret.from_name("telegram-bot")],
+    secrets=[
+        modal.Secret.from_name("ai-content-secrets"),
+        modal.Secret.from_name("telegram-bot"),
+        modal.Secret.from_name("resend-secret"),
+    ],
     max_containers=1,
     cpu=0.5,
     memory=1024,
