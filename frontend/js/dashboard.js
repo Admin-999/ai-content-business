@@ -45,10 +45,17 @@ function renderUsage(u) {
 
 async function loadUsage() {
   try {
-    renderUsage(await api("/api/usage"));
+    const u = await api("/api/usage");
+    renderUsage(u);
+    try { localStorage.setItem("ac_usage", JSON.stringify(u)); } catch (e) {}
   } catch (err) {
-    if (document.body.dataset.page === "dashboard" && !localStorage.getItem("ac_token")) return;
-    toast(err.message, "error");
+    const cached = localStorage.getItem("ac_usage");
+    if (!cached) {
+      if (document.body.dataset.page === "dashboard" && !localStorage.getItem("ac_token")) return;
+      toast(err.message, "error");
+      return;
+    }
+    try { renderUsage(JSON.parse(cached)); } catch (e) {}
   }
 }
 
@@ -375,6 +382,11 @@ async function saveProfile(e) {
     const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
     e.target.value = digits.length > 2 ? digits.slice(0, 2) + "/" + digits.slice(2) : digits;
   });
+
+  const cachedUsage = localStorage.getItem("ac_usage");
+  if (cachedUsage) {
+    try { renderUsage(JSON.parse(cachedUsage)); } catch (e) {}
+  }
 
   loadUsage();
   loadHistory();

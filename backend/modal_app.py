@@ -5,9 +5,10 @@
   python -m modal deploy modal_app.py
 
 После деплоя Modal печатает публичный URL вида https://<workspace>--ai-content-api-api.modal.build
-Приложение масштабируется до нуля (холодный старт несколько секунд), исходящий
-интернет из контейнера разрешён (Groq доступен). max_containers=1 + Volume /data —
-чтобы все запросы работали с одним постоянным SQLite-файлом (sqlite:////data/local.db).
+min_containers=1 держит один контейнер всегда включённым — сайт открывается
+мгновенно, без холодного старта (висит постоянная небольшая часть на Modal).
+max_containers=1 + Volume /data — чтобы все запросы работали с одним
+постоянным SQLite-файлом (sqlite:////data/local.db).
 """
 import modal
 
@@ -45,6 +46,7 @@ image = (
         modal.Secret.from_name("resend-secret"),
     ],
     max_containers=1,
+    min_containers=1,
     cpu=0.5,
     memory=1024,
     scaledown_window=1800,
