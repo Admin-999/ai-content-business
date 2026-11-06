@@ -268,6 +268,10 @@ function shrinkImage(file, done) {
         q -= 0.15;
         dataUrl = canvas.toDataURL("image/jpeg", q);
       }
+      if (dataUrl.length > 10000) {
+        toast("Это фото не удалось сжать до допустимого размера. Попробуйте другое.", "error");
+        return;
+      }
       done(dataUrl);
     };
     img.onerror = () => toast("Не удалось прочитать изображение.", "error");
@@ -286,10 +290,12 @@ function onAvatarFile() {
     toast("Поддерживаются PNG, JPEG и WebP.", "error");
     return;
   }
-  shrinkImage(file, (dataUrl) => {
+  toast("Обрабатываем фото…");
+  setTimeout(() => shrinkImage(file, (dataUrl) => {
     pendingAvatar = dataUrl;
     applyProfilePreview();
-  });
+    toast("Фото готово. Нажмите «Сохранить».", "success");
+  }), 50);
 }
 
 function removeAvatar() {
@@ -309,6 +315,7 @@ async function saveProfile(e) {
   btn.innerHTML = '<span class="spinner"></span>Сохраняем…';
   try {
     const p = await api("/api/auth/profile", { method: "PATCH", body });
+    if (!p || !("avatar" in p)) throw new Error("Сервер не подтвердил сохранение. Проверьте интернет и попробуйте ещё раз через минуту.");
     currentAvatar = p.avatar || null;
     pendingAvatar = undefined;
     renderHeaderProfile(p.name, p.avatar);
