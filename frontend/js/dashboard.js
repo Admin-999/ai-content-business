@@ -257,7 +257,7 @@ function shrinkImage(file, done) {
   reader.onload = () => {
     const img = new Image();
     img.onload = () => {
-      const SIZE = 256;
+      const SIZE = 128; // прокси Modal режет тела больше ~10 КБ — держим аватар компактным
       const canvas = document.createElement("canvas");
       canvas.width = SIZE;
       canvas.height = SIZE;
@@ -266,7 +266,13 @@ function shrinkImage(file, done) {
       const w = img.width * scale;
       const h = img.height * scale;
       ctx.drawImage(img, (SIZE - w) / 2, (SIZE - h) / 2, w, h);
-      done(canvas.toDataURL("image/jpeg", 0.85));
+      let q = 0.8;
+      let dataUrl = canvas.toDataURL("image/jpeg", q);
+      while (dataUrl.length > 8000 && q > 0.35) {
+        q -= 0.15;
+        dataUrl = canvas.toDataURL("image/jpeg", q);
+      }
+      done(dataUrl);
     };
     img.onerror = () => toast("Не удалось прочитать изображение.", "error");
     img.src = reader.result;
