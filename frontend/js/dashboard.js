@@ -190,11 +190,8 @@ let currentAvatar = null;
 let pendingAvatar; // undefined — не трогали, null — удалить, строка — новый data URL
 
 function renderHeaderProfile(name, avatar) {
-  const email = localStorage.getItem("ac_email") || "";
-  const letter = (name || email || "AI").charAt(0).toUpperCase();
   $("profileName").textContent = name || "";
   $("profileName").classList.toggle("hidden", !name);
-  $("avatarFallback").textContent = letter;
   if (avatar) {
     $("avatarImg").src = avatar;
     $("avatarImg").classList.remove("hidden");
@@ -239,7 +236,6 @@ async function loadProfile() {
 
 function openProfile() {
   $("pfName").value = $("profileName").textContent || "";
-  $("pfAvatarFallback").textContent = $("avatarFallback").textContent;
   pendingAvatar = undefined;
   $("profileError").classList.add("hidden");
   applyProfilePreview();
