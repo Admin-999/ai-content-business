@@ -1,27 +1,50 @@
 name: Ежедневный отчёт (cron)
 
+# Отчёт по генерациям за вчера + продление/понижение тарифов.
+# Backend запускается локально в раннере GitHub (там есть доступ к Supabase
+# и Resend), постоянный хостинг для этой задачи не нужен.
 on:
   schedule:
     - cron: "0 8 * * *"   # 08:00 UTC = 11:00 МСК, каждый день
-  workflow_dispatch:        # позволяет запустить вручную из вкладки Actions
+  workflow_dispatch:
 
 jobs:
   report:
     runs-on: ubuntu-latest
     steps:
-      - name: Вызвать cron-эндпоинт backend
-        shell: bash
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Установить зависимости backend
+        run: pip install -r backend/requirements.txt
+
+      - name: Запустить backend и выполнить ежедневный отчёт
         env:
-          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          FRONTEND_URL: https://admin-999.github.io/ai-content-business
+          IG_CARDS_DIR: /tmp/ig_cards
+          MP_PHOTOS_DIR: /tmp/mp_photos
+          OZON_CACHE: /tmp/ozon_categories.json
         run: |
-          if [ -z "$BACKEND_URL" ] || [ -z "$CRON_SECRET" ]; then
-            echo "Не заданы секреты BACKEND_URL и/или CRON_SECRET (Settings -> Secrets and variables -> Actions)"
-            exit 1
-          fi
+          set -e
+          mkdir -p /tmp/ig_cards /tmp/mp_photos
+          cd backend
+          uvicorn main:app --host 127.0.0.1 --port 8000 --log-level warning &
+          for i in $(seq 1 40); do
+            if curl -s -o /dev/null http://127.0.0.1:8000/api/health; then break; fi
+            sleep 1
+          done
+          echo "--- daily-report ---"
           code=$(curl -s --max-time 600 -o /tmp/resp.json -w "%{http_code}" \
-            -X POST "$BACKEND_URL/api/cron/daily-report" \
+            -X POST "http://127.0.0.1:8000/api/cron/daily-report" \
             -H "X-Cron-Secret: $CRON_SECRET")
           echo "HTTP $code"
-          cat /tmp/resp.json
+          cat /tmp/resp.json; echo
           test "$code" = "200"
