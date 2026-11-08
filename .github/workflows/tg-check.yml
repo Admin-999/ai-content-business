@@ -7,13 +7,16 @@ jobs:
   t:
     runs-on: ubuntu-latest
     steps:
-      - name: Проверить бота (getMe) и webhook
+      - uses: actions/checkout@v4
+
+      - name: Проверить бота (getMe)
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
-          echo "=== getMe ==="
           curl -s -m 30 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe" -o /tmp/me.json
-          python3 -c "import json;d=json.load(open('/tmp/me.json'));b=(d.get('result') or {});print('ok =',d.get('ok'));print('id =',b.get('id'));print('username = @'+str(b.get('username')));print('name =',b.get('first_name'));print('error =',d.get('description'))"
-          echo "=== getWebhookInfo ==="
-          curl -s -m 30 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getWebhookInfo" -o /tmp/wh.json
-          python3 -c "import json;d=json.load(open('/tmp/wh.json'));r=(d.get('result') or {});print('url =',r.get('url') or '(не задан)');print('pending =',r.get('pending_update_count'))"
+          python3 -c "import json;d=json.load(open('/tmp/me.json'));b=(d.get('result') or {});print('ok =',d.get('ok'));print('id =',b.get('id'));print('username = @'+str(b.get('username')));print('name =',b.get('first_name'))"
+
+      - name: Найти каналы, куда добавлен бот
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python3 scripts/tg_discover.py
