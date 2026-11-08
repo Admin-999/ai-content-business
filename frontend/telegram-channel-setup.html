@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Автопостинг в Telegram-канал — AI Контент</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%234f46e5'/%3E%3Ctext x='50' y='70' font-family='Arial,sans-serif' font-size='48' font-weight='bold' text-anchor='middle' fill='white'%3EAI%3C/text%3E%3C/svg%3E">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body{background:#f8fafc}</style>
+</head>
+<body class="text-slate-800 antialiased">
+  <header class="border-b border-slate-200 bg-white">
+    <div class="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
+      <a href="index.html" class="text-lg font-bold"><span class="text-indigo-600">AI Контент</span></a>
+      <a href="dashboard.html" class="text-sm text-slate-500 hover:text-slate-800">Личный кабинет</a>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-3xl px-4 py-12">
+    <h1 class="text-3xl font-extrabold">Автопостинг в Telegram-канал</h1>
+    <p class="mt-3 leading-relaxed text-slate-600">
+      ИИ будет сам писать посты и публиковать их в ваш Telegram-канал по расписанию.
+      Токены и пароли не нужны: вы один раз добавляете нашего бота администратором
+      канала — дальше всё работает само. Настройка занимает около 3 минут и бесплатна.
+    </p>
+
+    <div class="mt-6 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+      <b>Что понадобится:</b>
+      <ul class="mt-2 list-disc space-y-1 pl-5">
+        <li>приложение Telegram (телефон или компьютер);</li>
+        <li>ваш канал — если его ещё нет, создадим в шаге 1;</li>
+        <li>наш бот <span class="font-mono service-bot-name">@ai_kontent_autopost_bot</span> — вы дадите ему право публиковать посты (шаг 2).</li>
+      </ul>
+    </div>
+
+    <h2 class="mt-10 text-xl font-bold">Шаг 1. Откройте или создайте канал</h2>
+    <ol class="mt-3 list-decimal space-y-2 pl-6 leading-relaxed text-slate-600">
+      <li>Откройте в Telegram канал, в который должны выходить посты.</li>
+      <li>Если канала ещё нет — создайте: нажмите значок <b>«карандаш»</b> (или «＋»)
+        в правом нижнем углу → <b>«Новый канал»</b> → введите название и описание →
+        <b>«Создать»</b>.</li>
+      <li>Вы создали канал — значит вы его администратор, этого достаточно.</li>
+    </ol>
+
+    <h2 class="mt-8 text-xl font-bold">Шаг 2. Добавьте нашего бота администратором</h2>
+    <ol class="mt-3 list-decimal space-y-2 pl-6 leading-relaxed text-slate-600">
+      <li>Откройте канал и нажмите на его <b>название вверху</b> экрана.</li>
+      <li>Выберите <b>«Управление каналом»</b> (или «Информация о канале») →
+        <b>«Администраторы»</b> → <b>«Добавить администратора»</b>.</li>
+      <li>В строке поиска введите адрес нашего бота
+        <span class="font-mono service-bot-name">@ai_kontent_autopost_bot</span>
+        и выберите его из появившегося списка.</li>
+      <li>Нажмите <b>«Готово»</b> (или галочку). Обязательно оставьте включённым право
+        <b>«Публикация сообщений»</b> (Post messages) — именно оно разрешает боту
+        выкладывать посты.</li>
+    </ol>
+    <div class="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+      <b>Бот не находится в поиске?</b> Проверьте, что адрес введён точно, начиная с «@»
+      и без лишних пробелов. Второй способ: откройте профиль бота
+      <span class="font-mono service-bot-name">@ai_kontent_autopost_bot</span>,
+      нажмите «⋮» (или «Ещё») и выберите <b>«Добавить в канал»</b>.
+    </div>
+
+    <h2 class="mt-8 text-xl font-bold">Шаг 3. Узнайте адрес канала</h2>
+    <ol class="mt-3 list-decimal space-y-2 pl-6 leading-relaxed text-slate-600">
+      <li>Откройте канал → нажмите на <b>название</b> → <b>«Управление каналом»</b> →
+        <b>«Тип канала»</b>.</li>
+      <li>Выберите <b>«Публичный»</b> и придумайте адрес латиницей, например
+        <span class="font-mono">my_shop</span> — сохраните.</li>
+      <li>Готово: адрес канала — это <b>@my_shop</b> (ссылкой —
+        <span class="font-mono">https://t.me/my_shop</span>). Он понадобится в шаге 4.</li>
+    </ol>
+    <div class="mt-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+      Канал можно оставить и приватным — тогда вместо адреса понадобится <b>ID канала</b>
+      (число вида <span class="font-mono">-1001234567890</span>). Напишите нам, и мы поможем
+      подключить такой канал.
+    </div>
+
+    <h2 class="mt-8 text-xl font-bold">Шаг 4. Заполните форму в личном кабинете</h2>
+    <ol class="mt-3 list-decimal space-y-2 pl-6 leading-relaxed text-slate-600">
+      <li>Откройте <a href="dashboard.html" class="font-semibold text-indigo-600 underline">личный кабинет</a> →
+        раздел <b>«Автоматизация»</b> → вкладка <b>«Каналы и Instagram»</b> →
+        платформа <b>«Telegram-канал»</b>.</li>
+      <li><b>Название</b> — как вам удобно, для вас (например, «Магазин кухни»).</li>
+      <li><b>О чём канал и что публиковать</b> — тематика, товары и услуги, город.
+        Чем конкретнее, тем лучше посты.</li>
+      <li><b>Адрес канала</b> — вставьте <b>@my_shop</b> (или ссылку
+        <span class="font-mono">https://t.me/my_shop</span>) из шага 3.</li>
+      <li>Выберите <b>тон постов</b> и <b>как часто</b> публиковать (6, 12 или 24 часа).</li>
+      <li>Нажмите <b>«Подключить»</b>.</li>
+    </ol>
+
+    <h2 class="mt-8 text-xl font-bold">Шаг 5. Проверьте первый пост</h2>
+    <ol class="mt-3 list-decimal space-y-2 pl-6 leading-relaxed text-slate-600">
+      <li>В списке каналов под формой нажмите <b>«Выложить сейчас»</b> — через несколько
+        секунд в канале появится первый пост.</li>
+      <li>Дальше ИИ публикует сам с выбранной периодичностью — вмешиваться не нужно.</li>
+    </ol>
+
+    <h2 class="mt-10 text-xl font-bold">Полезно знать</h2>
+    <ul class="mt-3 list-disc space-y-2 pl-6 leading-relaxed text-slate-600">
+      <li>посты выходят <b>от имени вашего канала</b> — подписчики видят название и аватар
+        канала, а не бота;</li>
+      <li>право <b>«Публикация сообщений»</b> обязательно: без него появится ошибка
+        «бот ещё не администратор канала»;</li>
+      <li>одного бота можно добавить администратором сразу в <b>несколько каналов</b> —
+        ограничений нет;</li>
+      <li>каждый опубликованный пост списывается из дневного лимита генераций вашего тарифа;</li>
+      <li>автопостинг можно в любой момент остановить кнопкой <b>«Остановить»</b> — история
+        постов сохраняется;</li>
+      <li>если бота случайно удалили из администраторов, публикация приостановится —
+        просто добавьте его снова по шагу 2.</li>
+    </ul>
+
+    <a href="dashboard.html" class="mt-10 inline-block rounded-xl bg-indigo-600 px-6 py-3 font-semibold text-white transition hover:bg-indigo-500">Перейти к подключению</a>
+  </main>
+
+  <footer class="border-t border-slate-200 bg-white py-6 text-center text-sm text-slate-400">
+    <a href="privacy.html" class="hover:text-slate-600">Политика конфиденциальности</a>
+    ·
+    <a href="terms.html" class="hover:text-slate-600">Условия использования</a>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script>
+    // Подставляем актуальное имя бота сервиса из backend. Если backend недоступен,
+    // остаётся имя по умолчанию, прописанное в тексте страницы.
+    (function () {
+      var apiUrl = (window.APP_CONFIG && window.APP_CONFIG.API_URL) || "";
+      function apply(name) {
+        document.querySelectorAll(".service-bot-name").forEach(function (el) {
+          el.textContent = name;
+        });
+      }
+      if (!apiUrl) return;
+      fetch(apiUrl + "/api/channels/setup")
+        .then(function (resp) { return resp.json(); })
+        .then(function (data) {
+          if (data && data.bot_username) apply("@" + data.bot_username);
+        })
+        .catch(function () { /* backend недоступен — оставляем имя по умолчанию */ });
+    })();
+  </script>
+</body>
+</html>
