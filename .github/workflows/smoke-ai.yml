@@ -24,11 +24,4 @@ jobs:
           OPENAI_COMPAT_MODEL: openai
         run: |
           cd backend
-          python -c "
-import ai
-text, model = ai.generate_content('Запуск автопостинга в Telegram-канале', 'post', 'дружелюбный', 'ru')
-print('MODEL:', model)
-print('LEN:', len(text))
-print('---8<---')
-print(text)
-"
+          python -c "import ai; t,m=ai.generate_content('Запуск автопостинга в Telegram-канале','post','дружелюбный','ru'); print('MODEL:',m); print('LEN:',len(t)); print('---8<---'); print(t)"
