@@ -3,32 +3,42 @@ name: smoke (одноразовая проверка сети)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  models: read
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Проверить Telegram и Groq
+      - name: Telegram + Groq + GitHub Models
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "=== api.telegram.org ==="
           curl -s -o /dev/null -w "HTTP %{http_code}\n" -m 20 https://api.telegram.org/ || echo "недоступен"
-          echo "=== Groq /models ==="
-          curl -s -o /tmp/models.json -w "HTTP %{http_code}\n" -m 30 \
-            https://api.groq.com/openai/v1/models \
-            -H "Authorization: Bearer $GROQ_API_KEY"
-          head -c 300 /tmp/models.json; echo
-          echo "=== Groq chat completion ==="
-          curl -s -o /tmp/chat.json -w "HTTP %{http_code}\n" -m 60 \
-            -X POST https://api.groq.com/openai/v1/chat/completions \
-            -H "Authorization: Bearer $GROQ_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{"model":"llama-3.3-70b-versatile","messages":[{"role":"user","content":"скажи одно слово"}],"max_tokens":20}'
-          head -c 400 /tmp/chat.json; echo
-          echo "=== Groq chat completion (gpt-oss-120b) ==="
-          curl -s -o /tmp/chat2.json -w "HTTP %{http_code}\n" -m 60 \
-            -X POST https://api.groq.com/openai/v1/chat/completions \
-            -H "Authorization: Bearer $GROQ_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{"model":"openai/gpt-oss-120b","messages":[{"role":"user","content":"скажи одно слово"}],"max_tokens":20}'
-          head -c 400 /tmp/chat2.json; echo
+
+          echo "=== Groq ==="
+          curl -s -o /tmp/g.json -w "HTTP %{http_code}\n" -m 30 \
+            https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY"
+          head -c 200 /tmp/g.json; echo
+
+          echo "=== GitHub Models: models.github.ai ==="
+          curl -s -o /tmp/gh1.json -w "HTTP %{http_code}\n" -m 60 \
+            -X POST https://models.github.ai/inference/chat/completions \
+            -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" \
+            -d '{"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":"скажи одно слово"}],"max_tokens":20}'
+          head -c 500 /tmp/gh1.json; echo
+
+          echo "=== GitHub Models: models.inference.ai.azure.com ==="
+          curl -s -o /tmp/gh2.json -w "HTTP %{http_code}\n" -m 60 \
+            -X POST https://models.inference.ai.azure.com/chat/completions \
+            -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" \
+            -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"скажи одно слово"}],"max_tokens":20}'
+          head -c 500 /tmp/gh2.json; echo
+
+          echo "=== GitHub Models: catalog ==="
+          curl -s -o /tmp/gh3.json -w "HTTP %{http_code}\n" -m 30 \
+            https://models.github.ai/catalog/models -H "Authorization: Bearer $GH_TOKEN"
+          head -c 300 /tmp/gh3.json; echo
