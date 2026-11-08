@@ -1,4 +1,4 @@
-name: smoke2
+name: smoke3
 
 on:
   workflow_dispatch:
@@ -11,17 +11,32 @@ jobs:
   t:
     runs-on: ubuntu-latest
     steps:
-      - name: GitHub Models raw JSON
+      - name: GitHub Models diagnostics
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -s -m 60 -o /tmp/r.json \
+          echo "===== A: models.github.ai/inference/chat/completions (headers) ====="
+          curl -s -L -D /tmp/hA.txt -o /tmp/bA.txt -m 60 \
             -X POST https://models.github.ai/inference/chat/completions \
-            -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" \
-            -d '{"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":"ответь ровно одним словом: привет"}],"max_tokens":30}'
-          echo "bytes: $(wc -c < /tmp/r.json)"
-          echo "----- body -----"
-          cat /tmp/r.json
-          echo
-          echo "----- python parse test -----"
-          python3 -c "import json;d=json.load(open('/tmp/r.json'));print('choices:',d['choices'][0]['message']['content'])"
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -H "Content-Type: application/json" \
+            -d '{"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":"ответь словом привет"}],"max_tokens":30}'
+          echo "--- headers ---"; cat /tmp/hA.txt
+          echo "--- body ---"; cat /tmp/bA.txt; echo
+
+          echo "===== B: catalog ====="
+          curl -s -L -D /tmp/hB.txt -o /tmp/bB.txt -m 30 \
+            https://models.github.ai/catalog/models \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN"
+          echo "--- status line ---"; head -n 1 /tmp/hB.txt
+          echo "--- body (first 300) ---"; head -c 300 /tmp/bB.txt; echo
+
+          echo "===== C: api.github.com models ====="
+          curl -s -L -o /tmp/bC.txt -w "HTTP %{http_code}\n" -m 30 \
+            https://api.github.com/models \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN"
+          head -c 300 /tmp/bC.txt; echo
