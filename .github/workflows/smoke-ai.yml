@@ -1,0 +1,34 @@
+name: smoke-ai
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  models: read
+
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Установить зависимости
+        run: pip install -r backend/requirements.txt
+      - name: Проверить генерацию через боевой ai.py
+        env:
+          OPENAI_COMPAT_BASE_URL: https://text.pollinations.ai/openai
+          OPENAI_COMPAT_API_KEY: pollinations-not-needed
+          OPENAI_COMPAT_MODEL: openai
+        run: |
+          cd backend
+          python -c "
+import ai
+text, model = ai.generate_content('Запуск автопостинга в Telegram-канале', 'post', 'дружелюбный', 'ru')
+print('MODEL:', model)
+print('LEN:', len(text))
+print('---8<---')
+print(text)
+"
