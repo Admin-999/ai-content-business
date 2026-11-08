@@ -9,6 +9,10 @@ on:
     - cron: "0 */2 * * *"   # каждые 2 часа по UTC
   workflow_dispatch:          # позволяет запустить вручную из вкладки Actions
 
+concurrency:
+  group: autopost
+  cancel-in-progress: false
+
 jobs:
   autopost:
     runs-on: ubuntu-latest
@@ -27,8 +31,10 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GROQ_MODEL: openai/gpt-oss-120b
+          # Бесплатный LLM без ключа и регистрации (OpenAI-совместимый эндпоинт)
+          OPENAI_COMPAT_BASE_URL: https://text.pollinations.ai/openai
+          OPENAI_COMPAT_API_KEY: pollinations-not-needed
+          OPENAI_COMPAT_MODEL: openai
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           IG_CARDS_DIR: /tmp/ig_cards
           MP_PHOTOS_DIR: /tmp/mp_photos
