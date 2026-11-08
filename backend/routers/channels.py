@@ -362,7 +362,9 @@ def _publish_channel_once(cid, uid, title, description, tone, username, platform
             return "failed", text, str(e)
     else:
         try:
-            tgapi.send_message(TELEGRAM_BOT_TOKEN, f"@{username}", text)
+            # публичный канал адресуется как @username, приватный — числовым chat_id (-100...)
+            chat = username if username.lstrip("-").isdigit() else f"@{username}"
+            tgapi.send_message(TELEGRAM_BOT_TOKEN, chat, text)
         except tgapi.TelegramError as e:
             return "failed", text, str(e)
 
