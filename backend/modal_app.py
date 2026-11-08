@@ -40,7 +40,6 @@ image = (
 
 @app.function(
     image=image,
-    region="eu-central",
     secrets=[
         modal.Secret.from_name("ai-content-secrets"),
         modal.Secret.from_name("telegram-bot"),
