@@ -7,6 +7,8 @@
 После деплоя Modal печатает публичный URL вида https://<workspace>--ai-content-api-api.modal.build
 min_containers=1 держит один контейнер всегда включённым — сайт открывается
 мгновенно, без холодного старта (висит постоянная небольшая часть на Modal).
+0.25 ядра + 512 МиБ — минимально достаточная конфигурация: тёплый контейнер
+стоит ~$11/мес из $30 бесплатных кредитов Modal (0.5 ядра + 1 ГиБ стоили ~$23).
 max_containers=1 + Volume /data — чтобы все запросы работали с одним
 постоянным SQLite-файлом (sqlite:////data/local.db).
 """
@@ -47,8 +49,8 @@ image = (
     ],
     max_containers=1,
     min_containers=1,
-    cpu=0.5,
-    memory=1024,
+    cpu=0.25,
+    memory=512,
     scaledown_window=1800,
     volumes={"/data": volume},
 )

@@ -94,8 +94,14 @@ async function loadHistory() {
   try {
     const data = await api("/api/history?limit=20");
     renderHistory(data.items);
+    try { localStorage.setItem("ac_history", JSON.stringify(data)); } catch (e) {}
   } catch (err) {
-    toast(err.message, "error");
+    const cached = localStorage.getItem("ac_history");
+    if (!cached) {
+      toast(err.message, "error");
+      return;
+    }
+    try { renderHistory(JSON.parse(cached).items || []); } catch (e) {}
   }
 }
 
@@ -353,6 +359,8 @@ async function saveProfile(e) {
     localStorage.removeItem("ac_email");
     localStorage.removeItem("ac_name");
     localStorage.removeItem("ac_avatar");
+    localStorage.removeItem("ac_usage");
+    localStorage.removeItem("ac_history");
     location.href = "index.html";
   });
   $("profileBtn").addEventListener("click", openProfile);
@@ -386,6 +394,10 @@ async function saveProfile(e) {
   const cachedUsage = localStorage.getItem("ac_usage");
   if (cachedUsage) {
     try { renderUsage(JSON.parse(cachedUsage)); } catch (e) {}
+  }
+  const cachedHistory = localStorage.getItem("ac_history");
+  if (cachedHistory) {
+    try { renderHistory(JSON.parse(cachedHistory).items || []); } catch (e) {}
   }
 
   loadUsage();
