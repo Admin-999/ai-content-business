@@ -1,28 +1,13 @@
-name: Держим backend проснувшимся (keep-alive)
+name: Keep-alive (не требуется)
 
-# Render free «засыпает» после ~15 минут простоя, и первый запрос после этого
-# ждёт 30–60 секунд, пока контейнер запустится. Этот пинг раз в 10 минут
-# держит сервис тёплым, чтобы сайт открывался быстро.
-#
-# Не нужен — просто удалите этот файл.
+# Раньше этот workflow будил Render free, который «засыпал» после простоя.
+# Теперь автопостинг работает внутри GitHub Actions и постоянный backend
+# не нужен, поэтому пинг отключён. Файл оставлен, чтобы не ломать историю.
 on:
-  schedule:
-    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:
-  ping:
+  noop:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping /api/health
-        shell: bash
-        env:
-          BACKEND_URL: ${{ secrets.BACKEND_URL }}
-        run: |
-          if [ -z "$BACKEND_URL" ]; then
-            echo "BACKEND_URL не задан — пропускаю пинг."
-            exit 0
-          fi
-          code=$(curl -s -o /dev/null --max-time 120 -w "%{http_code}" "$BACKEND_URL/api/health")
-          echo "HTTP $code"
-          test "$code" = "200"
+      - run: echo "Backend больше не хостится постоянно — keep-alive не нужен."

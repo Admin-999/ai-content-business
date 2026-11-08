@@ -1,5 +1,9 @@
 name: Автопостинг в Telegram-каналы (cron)
 
+# Автопостинг выполняется ПРЯМО В GitHub Actions.
+# Раннер GitHub находится вне РФ, поэтому Telegram Bot API и Groq доступны.
+# Backend поднимается локально в раннере и вызывает свой же эндпоинт
+# /api/cron/autopost, работая с базой Supabase (секрет DATABASE_URL).
 on:
   schedule:
     - cron: "0 */2 * * *"   # каждые 2 часа по UTC
@@ -9,19 +13,43 @@ jobs:
   autopost:
     runs-on: ubuntu-latest
     steps:
-      - name: Запустить автопостинг на backend
-        shell: bash
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Установить зависимости backend
+        run: pip install -r backend/requirements.txt
+
+      - name: Запустить backend и выполнить автопостинг
         env:
-          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: openai/gpt-oss-120b
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          IG_CARDS_DIR: /tmp/ig_cards
+          MP_PHOTOS_DIR: /tmp/mp_photos
+          OZON_CACHE: /tmp/ozon_categories.json
+          FRONTEND_ORIGIN: https://admin-999.github.io
+          FRONTEND_URL: https://admin-999.github.io/ai-content-business
         run: |
-          if [ -z "$BACKEND_URL" ] || [ -z "$CRON_SECRET" ]; then
-            echo "Не заданы секреты BACKEND_URL и/или CRON_SECRET (Settings -> Secrets and variables -> Actions)"
-            exit 1
-          fi
-          code=$(curl -s --max-time 600 -o /tmp/resp.json -w "%{http_code}" \
-            -X POST "$BACKEND_URL/api/cron/autopost" \
+          set -e
+          mkdir -p /tmp/ig_cards /tmp/mp_photos
+          cd backend
+          uvicorn main:app --host 127.0.0.1 --port 8000 --log-level warning &
+          for i in $(seq 1 40); do
+            if curl -s -o /dev/null http://127.0.0.1:8000/api/health; then break; fi
+            sleep 1
+          done
+          echo "--- health ---"
+          curl -s http://127.0.0.1:8000/api/health; echo
+          echo "--- autopost ---"
+          code=$(curl -s --max-time 900 -o /tmp/resp.json -w "%{http_code}" \
+            -X POST "http://127.0.0.1:8000/api/cron/autopost" \
             -H "X-Cron-Secret: $CRON_SECRET")
           echo "HTTP $code"
-          cat /tmp/resp.json
+          cat /tmp/resp.json; echo
           test "$code" = "200"
