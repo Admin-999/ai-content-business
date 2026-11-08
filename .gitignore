@@ -18,3 +18,5 @@ node_modules/
 
 # Служебное
 .DS_Store
+
+.vercel

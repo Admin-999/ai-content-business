@@ -75,10 +75,16 @@ OZON_CACHE = os.getenv("OZON_CACHE", "/data/ozon_categories.json" if os.path.isd
 ALIEXPRESS_GATEWAY = os.getenv("ALIEXPRESS_GATEWAY", "https://api-sg.aliexpress.com/sync").rstrip("/")
 # Публичный адрес этого backend: по нему Telegram шлёт обновления ИИ-ботов,
 # а Instagram скачивает картинки-карточки постов.
-# На Render подставляется автоматически (RENDER_EXTERNAL_URL) — задавать вручную не нужно.
+# На Render подставляется автоматически (RENDER_EXTERNAL_URL),
+# на Vercel — из системных переменных (VERCEL_PROJECT_PRODUCTION_URL / VERCEL_URL).
+# Задавать вручную не нужно.
+_vercel_prod = os.getenv("VERCEL_PROJECT_PRODUCTION_URL", "").strip()
+_vercel_url = os.getenv("VERCEL_URL", "").strip()
 BACKEND_URL = (
     os.getenv("BACKEND_URL", "").rstrip("/")
     or os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+    or (f"https://{_vercel_prod}" if _vercel_prod else "")
+    or (f"https://{_vercel_url}" if _vercel_url else "")
     or "http://localhost:8000"
 )
 # Модель с распознаванием изображений (фото товаров Wildberries)
