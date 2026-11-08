@@ -1,4 +1,4 @@
-name: smoke (одноразовая проверка сети)
+name: smoke2
 
 on:
   workflow_dispatch:
@@ -8,37 +8,20 @@ permissions:
   models: read
 
 jobs:
-  smoke:
+  t:
     runs-on: ubuntu-latest
     steps:
-      - name: Telegram + Groq + GitHub Models
+      - name: GitHub Models raw JSON
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "=== api.telegram.org ==="
-          curl -s -o /dev/null -w "HTTP %{http_code}\n" -m 20 https://api.telegram.org/ || echo "недоступен"
-
-          echo "=== Groq ==="
-          curl -s -o /tmp/g.json -w "HTTP %{http_code}\n" -m 30 \
-            https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY"
-          head -c 200 /tmp/g.json; echo
-
-          echo "=== GitHub Models: models.github.ai ==="
-          curl -s -o /tmp/gh1.json -w "HTTP %{http_code}\n" -m 60 \
+          curl -s -m 60 -o /tmp/r.json \
             -X POST https://models.github.ai/inference/chat/completions \
             -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" \
-            -d '{"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":"скажи одно слово"}],"max_tokens":20}'
-          head -c 500 /tmp/gh1.json; echo
-
-          echo "=== GitHub Models: models.inference.ai.azure.com ==="
-          curl -s -o /tmp/gh2.json -w "HTTP %{http_code}\n" -m 60 \
-            -X POST https://models.inference.ai.azure.com/chat/completions \
-            -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/json" \
-            -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"скажи одно слово"}],"max_tokens":20}'
-          head -c 500 /tmp/gh2.json; echo
-
-          echo "=== GitHub Models: catalog ==="
-          curl -s -o /tmp/gh3.json -w "HTTP %{http_code}\n" -m 30 \
-            https://models.github.ai/catalog/models -H "Authorization: Bearer $GH_TOKEN"
-          head -c 300 /tmp/gh3.json; echo
+            -d '{"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":"ответь ровно одним словом: привет"}],"max_tokens":30}'
+          echo "bytes: $(wc -c < /tmp/r.json)"
+          echo "----- body -----"
+          cat /tmp/r.json
+          echo
+          echo "----- python parse test -----"
+          python3 -c "import json;d=json.load(open('/tmp/r.json'));print('choices:',d['choices'][0]['message']['content'])"
