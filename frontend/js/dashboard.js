@@ -105,6 +105,82 @@ async function loadHistory() {
   }
 }
 
+// --- Генерация без сервера ------------------------------------------------
+// Если backend недоступен, текст создаётся прямо в браузере через свободный
+// OpenAI-совместимый эндпоинт (ключ не нужен). Так генерация работает, даже
+// когда API-сервер выключен. Лимиты тарифа в этом режиме не считаются,
+// а результат сохраняется в истории браузера.
+const FREE_LLM_URL = "https://text.pollinations.ai/openai/chat/completions";
+const FREE_LLM_MODEL = "openai";
+
+const GEN_TASKS = {
+  post: "Напиши вовлекающий пост для социальных сетей на тему: «{topic}». Объём 150–250 слов. Первый абзац должен цеплять внимание. В конце добавь призыв к действию и 3–5 хештегов.",
+  article: "Напиши статью для корпоративного блога на тему: «{topic}». Объём 500–800 слов. Структура: цепляющий заголовок, вступление, 3–4 смысловых блока с подзаголовками, практические советы, короткий вывод.",
+  product: "Напиши продающее описание товара для интернет-магазина: «{topic}». Объём 150–300 слов. Структура: цепляющий заголовок, 3–5 ключевых выгод списком, краткое описание, призыв к действию.",
+};
+
+function buildPrompt(topic, contentType, tone, language) {
+  const task = (GEN_TASKS[contentType] || GEN_TASKS.post).replace("{topic}", topic);
+  const toneLine = tone ? "Тон текста: " + tone + "." : "";
+  const langLine = language === "ru" ? "русском" : language === "en" ? "английском" : language;
+  return (
+    "Ты — профессиональный коммерческий копирайтер с опытом 10 лет.\n" +
+    "Задача: " + task + "\n" +
+    toneLine + "\n" +
+    "Напиши текст на " + langLine + " языке.\n" +
+    "В ответе выведи только готовый текст, без пояснений и служебных пометок."
+  );
+}
+
+async function generateOffline(topic, contentType, tone, language) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 120000);
+  let resp;
+  try {
+    resp = await fetch(FREE_LLM_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: FREE_LLM_MODEL,
+        messages: [{ role: "user", content: buildPrompt(topic, contentType, tone, language) }],
+        max_tokens: 2048,
+        temperature: 0.8,
+      }),
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    throw new Error("Не удалось связаться с ИИ. Проверьте интернет и нажмите кнопку ещё раз.");
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!resp.ok) {
+    throw new Error("Не удалось сгенерировать текст (ошибка " + resp.status + "). Попробуйте ещё раз.");
+  }
+  let data = null;
+  try { data = await resp.json(); } catch (e) { data = null; }
+  const text = (((data || {}).choices || [{}])[0].message || {}).content || "";
+  if (!text.trim()) throw new Error("ИИ вернул пустой ответ. Попробуйте ещё раз.");
+  return { content: text.trim(), model: "browser:" + FREE_LLM_MODEL };
+}
+
+function saveLocalGeneration(topic, contentType, model, content) {
+  try {
+    const cached = JSON.parse(localStorage.getItem("ac_history") || "{}");
+    const items = cached.items || [];
+    items.unshift({
+      id: "local-" + Date.now(),
+      topic: topic,
+      content_type: contentType,
+      result: content,
+      model: model,
+      created_at: new Date().toISOString(),
+    });
+    const trimmed = items.slice(0, 20);
+    localStorage.setItem("ac_history", JSON.stringify({ items: trimmed }));
+    renderHistory(trimmed);
+  } catch (e) {}
+}
+
 async function generate(e) {
   e.preventDefault();
   const topic = $("topic").value.trim();
@@ -112,29 +188,48 @@ async function generate(e) {
     toast("Опишите тему подробнее: минимум 3 символа.", "error");
     return;
   }
+  const contentType = $("contentType").value;
+  const tone = $("tone").value;
+  const language = $("language").value;
+
   const btn = $("genBtn");
   const original = btn.textContent;
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Генерируем… до минуты';
 
   try {
-    const data = await api("/api/generate", {
-      method: "POST",
-      body: {
-        topic,
-        content_type: $("contentType").value,
-        tone: $("tone").value,
-        language: $("language").value,
-      },
-    });
+    let content, model, remaining = null, offline = false;
+    try {
+      const data = await api("/api/generate", {
+        method: "POST",
+        body: { topic, content_type: contentType, tone, language },
+      });
+      content = data.content;
+      model = data.model;
+      remaining = data.remaining;
+    } catch (err) {
+      // Сервер недоступен — генерируем прямо в браузере.
+      if (err.code !== "offline" && err.code !== "timeout") throw err;
+      const local = await generateOffline(topic, contentType, tone, language);
+      content = local.content;
+      model = local.model;
+      offline = true;
+    }
+
     $("resultCard").classList.remove("hidden");
-    $("resultText").textContent = data.content;
+    $("resultText").textContent = content;
     $("resultCard").scrollIntoView({ behavior: "smooth", block: "nearest" });
-    toast(`Готово! Осталось генераций сегодня: ${data.remaining}`, "success");
-    loadUsage();
-    loadHistory();
+
+    if (offline) {
+      saveLocalGeneration(topic, contentType, model, content);
+      toast("Готово! Сервер недоступен — текст создан прямо в браузере.", "success");
+    } else {
+      toast("Готово! Осталось генераций сегодня: " + remaining, "success");
+      loadUsage();
+      loadHistory();
+    }
   } catch (err) {
-    toast(err.message, "error");
+    toast((err && err.message) || "Не удалось сгенерировать текст.", "error");
   } finally {
     btn.disabled = false;
     btn.textContent = original;
