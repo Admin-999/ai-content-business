@@ -1,36 +1,43 @@
 # Blueprint для автодеплоя backend на Render.com (free tier).
 # В Render: New + -> Blueprint -> выберите этот репозиторий -> Apply.
+# После Apply откройте сервис -> Environment и заполните переменные,
+# которые Render пометит как "требует значения" (sync: false).
 services:
   - type: web
     name: ai-content-api
     runtime: python
     rootDir: backend
     plan: free
+    region: frankfurt
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
-      - key: DATABASE_URL            # Supabase: Settings -> Database -> Connection string (URI, порт 6543)
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: DATABASE_URL            # Supabase: Project Settings -> Database -> Connection string -> URI (порт 6543, пулер)
         sync: false
       - key: SECRET_KEY              # генерируется автоматически
         generateValue: true
-      - key: CRON_SECRET             # генерируется автоматически (скопируйте в секреты GitHub)
+      - key: CRON_SECRET             # генерируется автоматически; скопируйте значение в секреты GitHub Actions
         generateValue: true
-      - key: GEMINI_API_KEY          # aistudio.google.com -> Get API key
+      - key: GEMINI_API_KEY          # aistudio.google.com -> Get API key (основной ИИ-провайдер)
         sync: false
-      - key: GROQ_API_KEY            # необязательно, резервный провайдер
+      - key: GROQ_API_KEY            # console.groq.com/keys (резервный ИИ-провайдер, необязательно)
         sync: false
+      - key: TELEGRAM_BOT_TOKEN      # токен бота от @BotFather — нужен для автопостинга в Telegram
+        sync: false
+      - key: FRONTEND_ORIGIN         # CORS: адрес фронтенда (GitHub Pages)
+        value: "https://admin-999.github.io"
+      - key: FRONTEND_URL            # используется в письмах-отчётах
+        value: "https://admin-999.github.io"
+      - key: RESEND_API_KEY          # необязательно, для email-отчётов (resend.com)
+        sync: false
+      - key: EMAIL_FROM
+        value: "AI Контент <onboarding@resend.dev>"
       - key: OPENAI_COMPAT_BASE_URL  # необязательно: универсальный резерв (OpenRouter и др.)
         sync: false
       - key: OPENAI_COMPAT_API_KEY
         sync: false
       - key: OPENAI_COMPAT_MODEL
         sync: false
-      - key: FRONTEND_ORIGIN         # после деплоя фронтенда: https://<ваш-проект>.vercel.app
-        sync: false
-      - key: FRONTEND_URL            # тот же адрес, используется в письмах
-        sync: false
-      - key: RESEND_API_KEY          # необязательно, для email-отчётов
-        sync: false
-      - key: EMAIL_FROM
-        value: "AI Контент <onboarding@resend.dev>"

@@ -1,12 +1,10 @@
-name: Deploy backend (Modal)
+name: Deploy backend (Modal) — только вручную
 
+# Автодеплой на Modal отключён: backend переехал на Render (см. render.yaml).
+# Этот workflow оставлен на случай, если понадобится снова задеплоить на Modal —
+# запускать вручную из вкладки Actions.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "backend/**"
-      - ".github/workflows/deploy-backend.yml"
 
 jobs:
   deploy:

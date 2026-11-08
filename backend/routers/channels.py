@@ -323,6 +323,58 @@ def _fresh_ig_token(channel_id, token, expires_at, now):
     return new_token
 
 
+def _channel_subject(platform: str, title: str, description: str) -> str:
+    if platform == "instagram":
+        return (
+            f"Пост для Instagram-аккаунта «{title}» (публикуется как картинка с подписью). "
+            f"О чём аккаунт: {description}"
+        )
+    return f"Пост для Telegram-канала «{title}». О чём канал: {description}"
+
+
+def _publish_channel_once(cid, uid, title, description, tone, username, platform,
+                          access_token, ig_user_id, token_expires_at, now):
+    """Генерирует и публикует один пост в канал.
+
+    Возвращает (status, text, error); status == "sent" при успехе.
+    Квота списывается только за фактически опубликованный пост.
+    """
+    platform = platform or "telegram"
+    if platform == "telegram" and not TELEGRAM_BOT_TOKEN:
+        return "failed", "", "Автопостинг в Telegram недоступен: администратор сервиса не настроил бота."
+    if platform == "instagram" and not (access_token and ig_user_id):
+        return "failed", "", "Аккаунт Instagram подключён не полностью — удалите канал и подключите заново."
+
+    try:
+        text, model = generate_content(_channel_subject(platform, title, description), "post", tone, "ru")
+    except AIError as e:
+        return "failed", "", str(e)
+
+    if platform == "instagram":
+        token = _fresh_ig_token(cid, access_token, token_expires_at, now)
+        if not token:
+            return "failed", text, "Токен Instagram истёк — сгенерируйте новый в кабинете Meta и подключите аккаунт заново."
+        try:
+            filename = igcards.make_card(title, text)
+            image_url = f"{BACKEND_URL}/api/ig/cards/{filename}"
+            igapi.publish_image(token, ig_user_id, image_url, text)
+        except igapi.InstagramError as e:
+            return "failed", text, str(e)
+    else:
+        try:
+            tgapi.send_message(TELEGRAM_BOT_TOKEN, f"@{username}", text)
+        except tgapi.TelegramError as e:
+            return "failed", text, str(e)
+
+    database.execute("UPDATE channels SET last_post_at = %s WHERE id = %s", (now, cid))
+    database.execute(
+        "INSERT INTO generations (id, user_id, topic, content_type, tone, language, result, model, created_at) "
+        "VALUES (%s, %s, %s, 'post', %s, 'ru', %s, %s, %s)",
+        (new_id(), uid, f"Автопостинг: {title}", tone, text, model, now),
+    )
+    return "sent", text, None
+
+
 @router.post("/cron/autopost")
 def autopost(x_cron_secret: str = Header(default="")):
     """Запускается GitHub Actions каждые 2 часа. Пишет посты в активные Telegram-каналы и Instagram-аккаунты."""
@@ -346,65 +398,49 @@ def autopost(x_cron_secret: str = Header(default="")):
         if used_today(uid) >= daily_limit(plan):
             skipped += 1
             continue
-        platform = platform or "telegram"
-        if platform == "telegram" and not TELEGRAM_BOT_TOKEN:
+        if (platform or "telegram") == "telegram" and not TELEGRAM_BOT_TOKEN:
             skipped += 1
             continue
-        if platform == "instagram" and not (access_token and ig_user_id):
-            _log_post(cid, uid, "", "failed", "Аккаунт Instagram подключён не полностью — удалите канал и подключите заново.")
-            failed += 1
-            continue
 
-        if platform == "instagram":
-            subject = (
-                f"Пост для Instagram-аккаунта «{title}» (публикуется как картинка с подписью). "
-                f"О чём аккаунт: {description}"
-            )
-        else:
-            subject = f"Пост для Telegram-канала «{title}». О чём канал: {description}"
-        try:
-            text, model = generate_content(subject, "post", tone, "ru")
-        except AIError as e:
-            _log_post(cid, uid, "", "failed", str(e))
-            failed += 1
-            continue
-
-        if platform == "instagram":
-            token = _fresh_ig_token(cid, access_token, token_expires_at, now)
-            if not token:
-                _log_post(
-                    cid, uid, text, "failed",
-                    "Токен Instagram истёк — сгенерируйте новый в кабинете Meta и подключите аккаунт заново.",
-                )
-                failed += 1
-                continue
-            try:
-                filename = igcards.make_card(title, text)
-                image_url = f"{BACKEND_URL}/api/ig/cards/{filename}"
-                igapi.publish_image(token, ig_user_id, image_url, text)
-                status, error = "sent", None
-                database.execute("UPDATE channels SET last_post_at = %s WHERE id = %s", (now, cid))
-                sent += 1
-            except igapi.InstagramError as e:
-                status, error = "failed", str(e)
-                failed += 1
-        else:
-            try:
-                tgapi.send_message(TELEGRAM_BOT_TOKEN, f"@{username}", text)
-                status, error = "sent", None
-                database.execute("UPDATE channels SET last_post_at = %s WHERE id = %s", (now, cid))
-                sent += 1
-            except tgapi.TelegramError as e:
-                status, error = "failed", str(e)
-                failed += 1
-
-        if status == "sent":
-            # квота списывается только за фактически опубликованный пост:
-            # неудачные автопосты не должны расходовать дневной лимит
-            database.execute(
-                "INSERT INTO generations (id, user_id, topic, content_type, tone, language, result, model, created_at) "
-                "VALUES (%s, %s, %s, 'post', %s, 'ru', %s, %s, %s)",
-                (new_id(), uid, f"Автопостинг: {title}", tone, text, model, now),
-            )
+        status, text, error = _publish_channel_once(
+            cid, uid, title, description, tone, username, platform,
+            access_token, ig_user_id, token_expires_at, now,
+        )
         _log_post(cid, uid, text, status, error)
+        if status == "sent":
+            sent += 1
+        else:
+            failed += 1
     return {"status": "ok", "checked": len(rows), "sent": sent, "failed": failed, "skipped": skipped}
+
+
+@router.post("/channels/{cid}/publish")
+def publish_channel_now(cid: str, user: dict = Depends(get_current_user)):
+    """Ручная публикация поста в канал прямо сейчас, не дожидаясь расписания."""
+    row = database.fetchone(
+        "SELECT id, user_id, title, description, tone, channel_username, platform, "
+        "access_token, ig_user_id, token_expires_at FROM channels WHERE id = %s AND user_id = %s",
+        (cid, user["id"]),
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Канал не найден.")
+    (_, uid, title, description, tone, username, platform,
+     access_token, ig_user_id, token_expires_at) = row
+
+    limit = daily_limit(user["plan"])
+    used = used_today(uid)
+    if used >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Дневной лимит генераций исчерпан ({used} из {limit}). Обновите тариф или попробуйте завтра.",
+        )
+
+    now = utcnow()
+    status, text, error = _publish_channel_once(
+        cid, uid, title, description, tone, username, platform,
+        access_token, ig_user_id, token_expires_at, now,
+    )
+    _log_post(cid, uid, text, status, error)
+    if status != "sent":
+        raise HTTPException(status_code=502, detail=error or "Не удалось опубликовать пост.")
+    return {"status": "sent", "text": text, "remaining": max(0, limit - used_today(uid))}

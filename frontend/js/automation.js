@@ -2,15 +2,22 @@
 // Использует api()/toast()/copyText()/$/fmtDate/loadUsage из api.js и dashboard.js.
 
 // Отправка формы с файлом (FormData, без Content-Type: application/json)
-async function apiForm(path, formData) {
+async function apiForm(path, formData, timeoutMs = 120000) {
   const headers = {};
   const token = localStorage.getItem("ac_token");
   if (token) headers["Authorization"] = "Bearer " + token;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   let resp;
   try {
-    resp = await fetch(API_URL + path, { method: "POST", headers, body: formData });
+    resp = await fetch(API_URL + path, { method: "POST", headers, body: formData, signal: ctrl.signal });
   } catch (e) {
+    if (e && e.name === "AbortError") {
+      throw new Error("Сервер не ответил за " + Math.round(timeoutMs / 1000) + " секунд. Проверьте, что backend запущен, и попробуйте ещё раз.");
+    }
     throw new Error("Сервер не отвечает — возможно, он просыпается после паузы. Подождите минуту и попробуйте ещё раз.");
+  } finally {
+    clearTimeout(timer);
   }
   let data = null;
   try { data = await resp.json(); } catch (e) { data = null; }
@@ -86,6 +93,11 @@ async function apiForm(path, formData) {
 
     const actions = document.createElement("div");
     actions.className = "mt-3 flex flex-wrap gap-2";
+    const publishBtn = document.createElement("button");
+    publishBtn.className = "rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60";
+    publishBtn.textContent = "Выложить сейчас";
+    publishBtn.dataset.action = "publish";
+    publishBtn.dataset.id = ch.id;
     const toggleBtn = document.createElement("button");
     toggleBtn.className = "rounded-lg border border-white/15 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10";
     toggleBtn.textContent = ch.active ? "Поставить на паузу" : "Возобновить";
@@ -96,7 +108,7 @@ async function apiForm(path, formData) {
     deleteBtn.textContent = "Удалить";
     deleteBtn.dataset.action = "delete";
     deleteBtn.dataset.id = ch.id;
-    actions.append(toggleBtn, deleteBtn);
+    actions.append(publishBtn, toggleBtn, deleteBtn);
 
     card.append(head, meta, actions);
 
@@ -129,7 +141,7 @@ async function apiForm(path, formData) {
         if (!data.posts.length) {
           const p = document.createElement("p");
           p.className = "text-xs text-slate-500";
-          p.textContent = "Постов ещё не было — первый выйдет по расписанию.";
+          p.textContent = "Постов ещё не было. Нажмите «Выложить сейчас» или дождитесь расписания.";
           postsBox.appendChild(p);
           return;
         }
@@ -152,7 +164,7 @@ async function apiForm(path, formData) {
       }
     });
 
-    card.append(head, meta, actions, det);
+    card.append(det);
     return card;
   }
 
@@ -233,7 +245,21 @@ async function apiForm(path, formData) {
     const btnEl = e.target.closest("button[data-action]");
     if (!btnEl) return;
     try {
-      if (btnEl.dataset.action === "toggle") {
+      if (btnEl.dataset.action === "publish") {
+        const original = btnEl.textContent;
+        btnEl.disabled = true;
+        btnEl.innerHTML = '<span class="spinner"></span>Публикуем… до минуты';
+        try {
+          const data = await api("/api/channels/" + btnEl.dataset.id + "/publish", { method: "POST" });
+          toast("Пост опубликован! Осталось генераций сегодня: " + data.remaining, "success");
+          loadChannels();
+          loadUsage();
+        } catch (err) {
+          toast(err.message, "error");
+          btnEl.disabled = false;
+          btnEl.textContent = original;
+        }
+      } else if (btnEl.dataset.action === "toggle") {
         await api("/api/channels/" + btnEl.dataset.id + "/toggle", { method: "POST" });
         loadChannels();
       } else if (btnEl.dataset.action === "delete") {

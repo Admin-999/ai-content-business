@@ -12,20 +12,41 @@ function toast(message, type = "info") {
   toastTimer = setTimeout(() => { el.className = ""; }, 4500);
 }
 
-async function api(path, { method = "GET", body = null, auth = true, retry = method === "GET" } = {}) {
+// Сколько ждём ответа сервера, чтобы интерфейс не «висел» бесконечно.
+// Генерация и автопостинг могут занимать до минуты, поэтому таймаут большой,
+// но всё равно конечный: по его истечении показываем понятную ошибку.
+const API_TIMEOUT_MS = 120000;
+
+async function api(path, { method = "GET", body = null, auth = true, retry = method === "GET", timeoutMs = API_TIMEOUT_MS } = {}) {
   const headers = { "Content-Type": "application/json" };
   const token = localStorage.getItem("ac_token");
   if (auth && token) headers["Authorization"] = "Bearer " + token;
 
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+
   let resp;
   try {
-    resp = await fetch(API_URL + path, { method, headers, body: body ? JSON.stringify(body) : null });
+    resp = await fetch(API_URL + path, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : null,
+      signal: ctrl.signal,
+    });
   } catch (e) {
+    if (e && e.name === "AbortError") {
+      throw new Error(
+        "Сервер не ответил за " + Math.round(timeoutMs / 1000) +
+        " секунд. Похоже, он выключен или перегружен. Проверьте, что backend запущен, и попробуйте ещё раз."
+      );
+    }
     if (retry) {
       await new Promise((r) => setTimeout(r, 1500));
-      return api(path, { method, body, auth, retry: false });
+      return api(path, { method, body, auth, retry: false, timeoutMs });
     }
     throw new Error("Сервер не отвечает — возможно, он просыпается после паузы. Подождите минуту и нажмите кнопку ещё раз.");
+  } finally {
+    clearTimeout(timer);
   }
 
   let data = null;
@@ -39,7 +60,13 @@ async function api(path, { method = "GET", body = null, auth = true, retry = met
     throw new Error((data && data.detail) || "Сессия истекла. Войдите заново.");
   }
 
-  if (!resp.ok) throw new Error((data && data.detail) || "Ошибка сервера (" + resp.status + ")");
+  if (!resp.ok) {
+    const detail = data && data.detail;
+    if (detail) throw new Error(detail);
+    if (resp.status === 404) throw new Error("Сервис недоступен (404): backend выключен или переезжает. Попробуйте позже.");
+    if (resp.status >= 500) throw new Error("Сервис временно недоступен (" + resp.status + "). Попробуйте через минуту.");
+    throw new Error("Ошибка сервера (" + resp.status + ")");
+  }
   return data;
 }
 

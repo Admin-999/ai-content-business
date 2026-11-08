@@ -73,10 +73,14 @@ OZON_CACHE = os.getenv("OZON_CACHE", "/data/ozon_categories.json" if os.path.isd
 # Шлюз API AliExpress (протокол TOP): глобальный api-sg.aliexpress.com проверен и отвечает;
 # при необходимости можно переопределить другим регионом через переменную окружения
 ALIEXPRESS_GATEWAY = os.getenv("ALIEXPRESS_GATEWAY", "https://api-sg.aliexpress.com/sync").rstrip("/")
-# Публичный адрес этого backend, по нему Telegram шлёт обновления ИИ-ботов
-BACKEND_URL = os.getenv(
-    "BACKEND_URL", "https://vsvolodin2014--ai-content-api-api.us-east.modal.run"
-).rstrip("/")
+# Публичный адрес этого backend: по нему Telegram шлёт обновления ИИ-ботов,
+# а Instagram скачивает картинки-карточки постов.
+# На Render подставляется автоматически (RENDER_EXTERNAL_URL) — задавать вручную не нужно.
+BACKEND_URL = (
+    os.getenv("BACKEND_URL", "").rstrip("/")
+    or os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+    or "http://localhost:8000"
+)
 # Модель с распознаванием изображений (фото товаров Wildberries)
 GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL", "qwen/qwen3.8-27b")
 # API контента Wildberries (кабинет продавца)
