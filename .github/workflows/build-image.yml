@@ -36,3 +36,24 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: ghcr.io/admin-999/ai-content-business:latest
+
+      - name: Try to make package public
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "== /user endpoint =="
+          curl -sS -X PATCH \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/user/packages/container/ai-content-business \
+            -d '{"visibility":"public"}' | head -c 300
+          echo
+          echo "== /users endpoint =="
+          curl -sS -X PATCH \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/users/Admin-999/packages/container/ai-content-business \
+            -d '{"visibility":"public"}' | head -c 300
+          echo
