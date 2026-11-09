@@ -83,6 +83,8 @@
           <button id="copyBtn" class="rounded-lg border border-white/15 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10">Копировать</button>
         </div>
         <pre id="resultText" class="whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-200"></pre>
+        <img id="resultImage" class="mt-3 hidden w-full max-w-md rounded-lg border border-white/10" alt="Сгенерированное изображение" />
+        <a id="resultImageLink" class="mt-2 hidden text-xs text-indigo-300 hover:text-indigo-200" href="#" target="_blank" rel="noopener">Открыть изображение</a>
       </div>
     </section>
 
@@ -213,7 +215,7 @@
         <details class="rounded-xl border border-white/10 bg-slate-950/40 p-3 text-sm text-slate-300">
           <summary class="cursor-pointer font-medium">Как это работает?</summary>
           <ol class="mt-2 list-decimal space-y-1 pl-5 text-slate-400">
-            <li>Выберите маркетплейс, загрузите фото товара, напишите название и цену — ИИ рассмотрит фото и составит описание, характеристики и ключевые слова под требования площадки.</li>
+            <li>Выберите маркетплейс, при желании загрузите фото товара, напишите название и цену — ИИ составит описание, характеристики и ключевые слова, а если фото нет, нарисует изображение товара.</li>
             <li>Для Wildberries, Ozon и Яндекс Маркета можно подключить кабинет продавца ниже — тогда карточка опубликуется сама.</li>
             <li>Для AliExpress нужны ключи приложения из AliExpress Open Platform; без них карточка готова к копированию в один клик.</li>
           </ol>
@@ -279,7 +281,7 @@
 
         <form id="wbCardForm" class="mt-4 grid gap-4 md:grid-cols-3">
           <div>
-            <label for="wbPhoto" class="mb-1 block text-sm font-medium text-slate-300">Фото товара</label>
+            <label for="wbPhoto" class="mb-1 block text-sm font-medium text-slate-300">Фото товара (необязательно)</label>
             <input id="wbPhoto" type="file" accept="image/jpeg,image/png,image/webp" class="field">
           </div>
           <div>
@@ -292,7 +294,7 @@
           </div>
           <div class="md:col-span-3">
             <button id="wbCardBtn" type="submit" class="rounded-xl bg-indigo-600 px-4 py-2.5 font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60">Создать карточку</button>
-            <p class="mt-2 text-xs text-slate-500">ИИ рассматривает фото — это займёт до минуты. Списывается из дневного лимита.</p>
+            <p class="mt-2 text-xs text-slate-500">ИИ рассмотрит фото или, если его нет, сам нарисует изображение товара, — это займёт до минуты. Списывается из дневного лимита.</p>
           </div>
         </form>
 

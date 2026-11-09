@@ -59,6 +59,22 @@ async function loadUsage() {
   }
 }
 
+function showResultImage(url) {
+  const img = $("resultImage");
+  const link = $("resultImageLink");
+  if (!img || !link) return;
+  if (url) {
+    img.src = url;
+    img.classList.remove("hidden");
+    link.href = url;
+    link.classList.remove("hidden");
+  } else {
+    img.removeAttribute("src");
+    img.classList.add("hidden");
+    link.classList.add("hidden");
+  }
+}
+
 function renderHistory(items) {
   const list = $("historyList");
   list.innerHTML = "";
@@ -86,6 +102,14 @@ function renderHistory(items) {
     pre.textContent = it.result;
 
     d.append(s, meta, pre);
+    if (it.image_url) {
+      const img = document.createElement("img");
+      img.className = "mt-3 w-full max-w-xs rounded-lg border border-white/10";
+      img.loading = "lazy";
+      img.alt = "Изображение к материалу";
+      img.src = it.image_url;
+      d.appendChild(img);
+    }
     list.appendChild(d);
   }
 }
@@ -199,7 +223,7 @@ async function generate(e) {
   btn.innerHTML = '<span class="spinner"></span>Генерируем… до минуты';
 
   try {
-    let content, model, remaining = null, offline = false;
+    let content, model, imageUrl = null, remaining = null, offline = false;
     try {
       const data = await api("/api/generate", {
         method: "POST",
@@ -207,6 +231,7 @@ async function generate(e) {
       });
       content = data.content;
       model = data.model;
+      imageUrl = data.image_url || null;
       remaining = data.remaining;
     } catch (err) {
       // Сервер недоступен — генерируем прямо в браузере.
@@ -219,6 +244,7 @@ async function generate(e) {
 
     $("resultCard").classList.remove("hidden");
     $("resultText").textContent = content;
+    showResultImage(imageUrl);
     $("resultCard").scrollIntoView({ behavior: "smooth", block: "nearest" });
 
     if (offline) {

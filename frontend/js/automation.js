@@ -464,6 +464,14 @@ async function apiForm(path, formData, timeoutMs = 120000) {
     desc.textContent = c.description;
     box.append(h, st, desc);
 
+    if (c.image_url) {
+      const img = document.createElement("img");
+      img.className = "mt-3 w-full max-w-xs rounded-lg border border-white/10";
+      img.alt = "Изображение товара";
+      img.src = c.image_url;
+      box.appendChild(img);
+    }
+
     if (c.characteristics && c.characteristics.length) {
       const ul = document.createElement("ul");
       ul.className = "mt-2 space-y-1 text-sm text-slate-300";
@@ -499,7 +507,7 @@ async function apiForm(path, formData, timeoutMs = 120000) {
       if (!data.cards.length) {
         const p = document.createElement("p");
         p.className = "text-sm text-slate-400";
-        p.textContent = "Карточек пока нет. Загрузите фото товара выше — и ИИ составит первую.";
+        p.textContent = "Карточек пока нет. Создайте первую выше — можно без фото, ИИ нарисует товар сам.";
         list.appendChild(p);
         return;
       }
@@ -517,6 +525,14 @@ async function apiForm(path, formData, timeoutMs = 120000) {
         pre.className = "mt-2 whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-300";
         pre.textContent = c.description;
         d.append(s, meta, pre);
+        if (c.image_url) {
+          const img = document.createElement("img");
+          img.className = "mt-3 w-full max-w-xs rounded-lg border border-white/10";
+          img.loading = "lazy";
+          img.alt = "Изображение товара";
+          img.src = c.image_url;
+          d.appendChild(img);
+        }
         list.appendChild(d);
       }
     } catch (err) {
@@ -527,22 +543,23 @@ async function apiForm(path, formData, timeoutMs = 120000) {
   $("wbCardForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const file = $("wbPhoto").files[0];
-    if (!file) return toast("Выберите фото товара (JPEG, PNG или WebP).", "error");
     const name = $("wbName").value.trim();
     if (name.length < 3) return toast("Введите название товара: минимум 3 символа.", "error");
     const price = parseInt($("wbPrice").value, 10);
     if (!price || price < 1) return toast("Укажите цену в рублях, например 590.", "error");
-    if (file.size > 8 * 1024 * 1024) return toast("Фото больше 8 МБ — выберите поменьше.", "error");
+    if (file && file.size > 8 * 1024 * 1024) return toast("Фото больше 8 МБ — выберите поменьше.", "error");
 
     const fd = new FormData();
-    fd.append("photo", file);
+    if (file) fd.append("photo", file);
     fd.append("name", name);
     fd.append("price_rub", String(price));
     fd.append("platform", $("wbPlatform").value);
 
     const btn = $("wbCardBtn");
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>ИИ рассматривает фото… до минуты';
+    btn.innerHTML = file
+      ? '<span class="spinner"></span>ИИ рассматривает фото… до минуты'
+      : '<span class="spinner"></span>ИИ рисует товар и пишет карточку… до минуты';
     try {
       const data = await apiForm("/api/wb/cards", fd);
       renderWbResult(data);

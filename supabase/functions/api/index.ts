@@ -252,7 +252,7 @@ function buildPrompt(topic: string, contentType: string, tone: string, language:
     "Не используй Markdown-разметку (звёздочки, решётки, подчёркивания) — только чистый текст.";
 }
 
-async function llmComplete(prompt: string, temperature = 0.8, maxTokens = 2048): Promise<[string, string]> {
+async function llmComplete(prompt: string, temperature = 0.8, maxTokens = 4096): Promise<[string, string]> {
   if (!LLM_BASE || !LLM_MODEL) {
     throw new Error("Не настроен AI-провайдер.");
   }
@@ -264,6 +264,9 @@ async function llmComplete(prompt: string, temperature = 0.8, maxTokens = 2048):
       messages: [{ role: "user", content: prompt }],
       temperature,
       max_tokens: maxTokens,
+      // Не даём модели тратить весь лимит на «размышления» — иначе она
+      // возвращает ошибку output_token_limit_exceeded на длинных запросах.
+      reasoning_effort: "low",
     }),
   });
   if (!resp.ok) {
@@ -382,6 +385,41 @@ async function describeImage(imageBytes: Uint8Array, mime: string, prompt: strin
     }
   }
   return null;
+}
+
+// --- Генерация картинок (бесплатный Pollinations, ключ не нужен) -------------
+function imagePrompt(topic: string, contentType: string): string {
+  const style = contentType === "product"
+    ? "professional product photo, clean bright background, studio lighting, high detail, centered"
+    : "bright modern illustration, high quality, detailed";
+  return `${topic}. ${style}, no watermark, no text, no letters`;
+}
+
+// Генерирует картинку по тексту и сохраняет её в хранилище. Возвращает байты,
+// mime и публичный URL — либо null, если генератор недоступен (не роняем запрос).
+async function generateImageBytes(
+  prompt: string,
+  width = 1024,
+  height = 1024,
+): Promise<{ bytes: Uint8Array; mime: string; url: string } | null> {
+  try {
+    const seed = Math.floor(Math.random() * 1_000_000_000);
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}` +
+      `?width=${width}&height=${height}&nologo=true&seed=${seed}`;
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    if (bytes.length < 1024) return null;
+    const stored = await savePhoto(bytes, "image/jpeg");
+    return { bytes, mime: "image/jpeg", url: stored };
+  } catch {
+    return null;
+  }
+}
+
+async function generateImage(prompt: string, width = 1024, height = 1024): Promise<string | null> {
+  const res = await generateImageBytes(prompt, width, height);
+  return res ? res.url : null;
 }
 
 // --- Supabase Storage -------------------------------------------------------
@@ -1333,8 +1371,8 @@ route("GET", /^\/api\/history$/, async (ctx) => {
   if (!Number.isFinite(limit) || limit < 1) limit = 20;
   if (limit > 50) limit = 50;
   const rows = await sql<
-    { id: string; topic: string; content_type: string; result: string; model: string | null; created_at: Date | null }[]
-  >`SELECT id, topic, content_type, result, model, created_at FROM generations
+    { id: string; topic: string; content_type: string; result: string; model: string | null; image_url: string | null; created_at: Date | null }[]
+  >`SELECT id, topic, content_type, result, model, image_url, created_at FROM generations
     WHERE user_id = ${user.id} ORDER BY created_at DESC LIMIT ${limit}`;
   return json({
     items: rows.map((r) => ({
@@ -1343,6 +1381,7 @@ route("GET", /^\/api\/history$/, async (ctx) => {
       content_type: r.content_type,
       result: r.result,
       model: r.model,
+      image_url: r.image_url,
       created_at: iso(r.created_at),
     })),
   });
@@ -1377,14 +1416,17 @@ route("POST", /^\/api\/generate$/, async (ctx) => {
     return fail(502, `Сервис генерации временно недоступен, попробуйте ещё раз через минуту. (${e})`);
   }
 
+  const imageUrl = await generateImage(imagePrompt(topic, contentType));
+
   const gid = uuid();
-  await sql`INSERT INTO generations (id, user_id, topic, content_type, tone, language, result, model, created_at)
-            VALUES (${gid}, ${user.id}, ${topic}, ${contentType}, ${tone}, ${language}, ${text}, ${model}, ${now()})`;
+  await sql`INSERT INTO generations (id, user_id, topic, content_type, tone, language, result, model, image_url, created_at)
+            VALUES (${gid}, ${user.id}, ${topic}, ${contentType}, ${tone}, ${language}, ${text}, ${model}, ${imageUrl}, ${now()})`;
   used += 1;
   return json({
     id: gid,
     content: text,
     model,
+    image_url: imageUrl,
     used_today: used,
     limit,
     remaining: Math.max(limit - used, 0),
@@ -1896,10 +1938,13 @@ route("POST", /^\/api\/wb\/cards$/, async (ctx) => {
   if (name.length < 3) return fail(422, "Укажите название товара (минимум 3 символа).");
   if (!(priceRub >= 1 && priceRub <= 10_000_000)) return fail(422, "Укажите цену в рублях от 1 до 10 000 000.");
   if (!MARKETPLACES[platform]) return fail(422, "Неизвестный маркетплейс. Доступны: Wildberries, Ozon, AliExpress, Яндекс Маркет.");
-  if (!(file instanceof File) || !file.size) return fail(422, "Загрузите фото товара.");
-  if (file.size > PHOTO_MAX) return fail(422, "Фото слишком большое: максимум 8 МБ.");
-  const mime = (file.type || "").split(";")[0].trim().toLowerCase();
-  if (!PHOTO_MIME[mime]) return fail(422, "Поддерживаются фото: JPEG, PNG, WebP.");
+  const hasPhoto = file instanceof File && file.size > 0;
+  let mime = "image/jpeg";
+  if (hasPhoto) {
+    if (file.size > PHOTO_MAX) return fail(422, "Фото слишком большое: максимум 8 МБ.");
+    mime = (file.type || "").split(";")[0].trim().toLowerCase();
+    if (!PHOTO_MIME[mime]) return fail(422, "Поддерживаются фото: JPEG, PNG, WebP.");
+  }
 
   const limit = dailyLimit(user.plan);
   let used = await usedToday(user.id);
@@ -1907,19 +1952,35 @@ route("POST", /^\/api\/wb\/cards$/, async (ctx) => {
     return fail(429, `Достигнут дневной лимит: ${used} из ${limit} генераций. Лимит обновится в 00:00 UTC.`);
   }
 
-  const photoBytes = new Uint8Array(await file.arrayBuffer());
   const mpName = MARKETPLACES[platform].name;
 
+  let photoBytes: Uint8Array;
+  let imageUrl: string | null = null;
   let visionText: string | null = null;
   let visionModel = "нет (карточка по названию и цене)";
-  try {
-    const vision = await describeImage(photoBytes, mime, visionPrompt());
-    if (vision) {
-      visionText = vision[0];
-      visionModel = vision[1];
+
+  if (hasPhoto) {
+    photoBytes = new Uint8Array(await file.arrayBuffer());
+    imageUrl = await savePhoto(photoBytes, mime);
+    try {
+      const vision = await describeImage(photoBytes, mime, visionPrompt());
+      if (vision) {
+        visionText = vision[0];
+        visionModel = vision[1];
+      }
+    } catch {
+      visionText = null;
     }
-  } catch {
-    visionText = null;
+  } else {
+    // Фото не загружено — бесплатно генерируем изображение товара в браузере ИИ.
+    const gen = await generateImageBytes(
+      `${name}, professional product photo, clean bright background, studio lighting, high detail, centered`,
+    );
+    if (!gen) return fail(502, "Не удалось сгенерировать изображение товара. Загрузите фото или попробуйте позже.");
+    photoBytes = gen.bytes;
+    mime = gen.mime;
+    imageUrl = gen.url;
+    visionModel = "нет (фото сгенерировано)";
   }
 
   let card: any, model: string;
@@ -1949,14 +2010,12 @@ route("POST", /^\/api\/wb\/cards$/, async (ctx) => {
         subject = await wbPublish(acc.api_token, photoBytes, mime, name, card);
       } else if (platform === "ozon") {
         const creds = JSON.parse(acc.api_token);
-        const photoUrl = await savePhoto(photoBytes, mime);
-        subject = await ozonPublish(creds.client_id, creds.api_key, photoUrl, name, priceRub, card);
+        subject = await ozonPublish(creds.client_id, creds.api_key, imageUrl!, name, priceRub, card);
       } else if (platform === "yamarket") {
         const extraData = JSON.parse(acc.extra || "{}");
         const campaignId = extraData.campaign_id;
         if (!campaignId) throw new MarketplaceError("Магазин Маркета подключён без кампании — подключите его заново.");
-        const photoUrl = await savePhoto(photoBytes, mime);
-        subject = await yamarketPublish(acc.api_token, campaignId, photoUrl, name, priceRub, card);
+        subject = await yamarketPublish(acc.api_token, campaignId, imageUrl!, name, priceRub, card);
       } else {
         const creds = JSON.parse(acc.api_token);
         subject = await aliPublish(creds, photoBytes, mime, name, priceRub, card);
@@ -1968,12 +2027,12 @@ route("POST", /^\/api\/wb\/cards$/, async (ctx) => {
     }
   }
 
-  await sql`INSERT INTO generations (id, user_id, topic, content_type, tone, language, result, model, created_at)
-            VALUES (${uuid()}, ${user.id}, ${"Карточка " + mpName + ": " + name}, 'product', 'продающий', 'ru', ${description}, ${model}, ${now()})`;
+  await sql`INSERT INTO generations (id, user_id, topic, content_type, tone, language, result, model, image_url, created_at)
+            VALUES (${uuid()}, ${user.id}, ${"Карточка " + mpName + ": " + name}, 'product', 'продающий', 'ru', ${description}, ${model}, ${imageUrl}, ${now()})`;
   const wid = uuid();
-  await sql`INSERT INTO wb_cards (id, user_id, platform, name, price_rub, description, characteristics, keywords, status, error, created_at)
+  await sql`INSERT INTO wb_cards (id, user_id, platform, name, price_rub, description, characteristics, keywords, status, error, image_url, created_at)
             VALUES (${wid}, ${user.id}, ${platform}, ${name}, ${priceRub}, ${description},
-              ${JSON.stringify(characteristics)}, ${keywords}, ${status}, ${error}, ${now()})`;
+              ${JSON.stringify(characteristics)}, ${keywords}, ${status}, ${error}, ${imageUrl}, ${now()})`;
   used += 1;
   return json({
     id: wid,
@@ -1984,6 +2043,7 @@ route("POST", /^\/api\/wb\/cards$/, async (ctx) => {
     description,
     characteristics,
     keywords,
+    image_url: imageUrl,
     publish_status: status,
     publish_subject: subject,
     publish_error: error,
@@ -2000,8 +2060,9 @@ route("GET", /^\/api\/wb\/cards$/, async (ctx) => {
   if (!user) return fail(401, "Требуется авторизация. Войдите в аккаунт.");
   const rows = await sql<
     { id: string; platform: string; name: string; price_rub: number; description: string;
-      characteristics: string | null; keywords: string | null; status: string; error: string | null; created_at: Date | null }[]
-  >`SELECT id, platform, name, price_rub, description, characteristics, keywords, status, error, created_at
+      characteristics: string | null; keywords: string | null; status: string; error: string | null;
+      image_url: string | null; created_at: Date | null }[]
+  >`SELECT id, platform, name, price_rub, description, characteristics, keywords, status, error, image_url, created_at
     FROM wb_cards WHERE user_id = ${user.id} ORDER BY created_at DESC LIMIT 20`;
   const cards = rows.map((r) => {
     let chars: any[] = [];
@@ -2022,6 +2083,7 @@ route("GET", /^\/api\/wb\/cards$/, async (ctx) => {
       keywords: r.keywords,
       status: r.status,
       error: r.error,
+      image_url: r.image_url,
       created_at: iso(r.created_at),
     };
   });
