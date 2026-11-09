@@ -30,7 +30,17 @@ const CRON_SECRET = (Deno.env.get("CRON_SECRET") || "").trim();
 const LLM_BASE = (Deno.env.get("OPENAI_COMPAT_BASE_URL") || "").replace(/\/$/, "");
 const LLM_KEY = Deno.env.get("OPENAI_COMPAT_API_KEY") || "";
 const LLM_MODEL = Deno.env.get("OPENAI_COMPAT_MODEL") || "";
-const VISION_ENABLED = !!(Deno.env.get("OPENAI_COMPAT_VISION") || "").trim();
+// Vision (анализ фото товара). Работает любой из бесплатных провайдеров с ключом:
+//   * Google Gemini           — GEMINI_API_KEY (модель GEMINI_MODEL)
+//   * Groq                    — GROQ_API_KEY (модель GROQ_VISION_MODEL)
+//   * OpenAI-совместимый      — VISION_BASE_URL / VISION_API_KEY / VISION_MODEL
+const GEMINI_API_KEY = (Deno.env.get("GEMINI_API_KEY") || "").trim();
+const GEMINI_MODEL = (Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash").trim();
+const GROQ_API_KEY = (Deno.env.get("GROQ_API_KEY") || "").trim();
+const GROQ_VISION_MODEL = (Deno.env.get("GROQ_VISION_MODEL") || "meta-llama/llama-4-scout-17b-16e-instruct").trim();
+const VISION_BASE = (Deno.env.get("VISION_BASE_URL") || "").replace(/\/$/, "");
+const VISION_KEY = Deno.env.get("VISION_API_KEY") || "";
+const VISION_MODEL = (Deno.env.get("VISION_MODEL") || "").trim();
 
 const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") || "").replace(/\/$/, "");
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -286,37 +296,92 @@ async function generateContent(
   return await llmComplete(buildPrompt(topic, contentType, tone, language));
 }
 
-// Распознавание фото товара — best-effort. У бесплатного Pollinations нет
-// vision-модели, поэтому по умолчанию возвращаем null и карточка строится по
-// названию и цене. Если владелец подключит vision-провайдера, задайте
-// OPENAI_COMPAT_VISION=1 — и анализ фото включится автоматически.
-async function describeImage(imageBytes: Uint8Array, mime: string, prompt: string): Promise<string | null> {
-  if (!VISION_ENABLED || !LLM_BASE || !LLM_MODEL) return null;
-  try {
-    const b64 = bytesToBase64(imageBytes);
-    const resp = await fetch(`${LLM_BASE}/chat/completions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${LLM_KEY}` },
-      body: JSON.stringify({
-        model: LLM_MODEL,
-        messages: [{
-          role: "user",
-          content: [
+// Распознавание фото товара (vision). Пробует провайдеров по очереди и
+// возвращает [описание, метка_модели] либо null, если ни один не настроен/не
+// ответил. Карточка при этом всё равно строится — по названию и цене.
+function geminiText(data: any): string {
+  const candidates = data?.candidates || [];
+  const parts = candidates.length ? (candidates[0]?.content?.parts || []) : [];
+  return parts.map((p: any) => String(p?.text || "")).join("").trim();
+}
+
+async function describeImage(imageBytes: Uint8Array, mime: string, prompt: string): Promise<[string, string] | null> {
+  const b64 = bytesToBase64(imageBytes);
+  const attempts: Array<[string, () => Promise<string>]> = [];
+
+  if (GEMINI_API_KEY) {
+    attempts.push([`gemini:${GEMINI_MODEL}`, async () => {
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+          body: JSON.stringify({
+            contents: [{ parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mime, data: b64 } },
+            ] }],
+            generationConfig: { temperature: 0.4, maxOutputTokens: 2048 },
+          }),
+        },
+      );
+      if (!resp.ok) throw new Error(`Gemini ${resp.status}`);
+      const data = await resp.json().catch(() => null);
+      return geminiText(data);
+    }]);
+  }
+
+  if (GROQ_API_KEY) {
+    attempts.push([`groq:${GROQ_VISION_MODEL}`, async () => {
+      const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_API_KEY}` },
+        body: JSON.stringify({
+          model: GROQ_VISION_MODEL,
+          messages: [{ role: "user", content: [
             { type: "text", text: prompt },
             { type: "image_url", image_url: { url: `data:${mime};base64,${b64}` } },
-          ],
-        }],
-        temperature: 0.4,
-        max_tokens: 1024,
-      }),
-    });
-    if (!resp.ok) return null;
-    const data = await resp.json().catch(() => null);
-    const text = String(data?.choices?.[0]?.message?.content || "").trim();
-    return text || null;
-  } catch {
-    return null;
+          ] }],
+          temperature: 0.4,
+          max_tokens: 2048,
+        }),
+      });
+      if (!resp.ok) throw new Error(`Groq ${resp.status}`);
+      const data = await resp.json().catch(() => null);
+      return String(data?.choices?.[0]?.message?.content || "").trim();
+    }]);
   }
+
+  if (VISION_BASE && VISION_MODEL) {
+    attempts.push([`vision:${VISION_MODEL}`, async () => {
+      const resp = await fetch(`${VISION_BASE}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${VISION_KEY}` },
+        body: JSON.stringify({
+          model: VISION_MODEL,
+          messages: [{ role: "user", content: [
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: `data:${mime};base64,${b64}` } },
+          ] }],
+          temperature: 0.4,
+          max_tokens: 2048,
+        }),
+      });
+      if (!resp.ok) throw new Error(`Vision ${resp.status}`);
+      const data = await resp.json().catch(() => null);
+      return String(data?.choices?.[0]?.message?.content || "").trim();
+    }]);
+  }
+
+  for (const [label, call] of attempts) {
+    try {
+      const text = await call();
+      if (text) return [text, label];
+    } catch {
+      // провайдер недоступен — пробуем следующего
+    }
+  }
+  return null;
 }
 
 // --- Supabase Storage -------------------------------------------------------
@@ -1848,8 +1913,11 @@ route("POST", /^\/api\/wb\/cards$/, async (ctx) => {
   let visionText: string | null = null;
   let visionModel = "нет (карточка по названию и цене)";
   try {
-    visionText = await describeImage(photoBytes, mime, visionPrompt());
-    if (visionText) visionModel = `compat:${LLM_MODEL}`;
+    const vision = await describeImage(photoBytes, mime, visionPrompt());
+    if (vision) {
+      visionText = vision[0];
+      visionModel = vision[1];
+    }
   } catch {
     visionText = null;
   }
