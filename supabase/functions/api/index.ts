@@ -774,5 +774,13 @@ Deno.serve(async (req: Request) => {
       }
     }
   }
+  // Разделы, ещё не перенесённые на Edge Functions (маркетплейсы и ИИ-боты):
+  // отдаём понятное сообщение вместо невнятной 404.
+  const NOT_PORTED = /^\/api\/(wb|bots)(\/|$)/;
+  if (cands.some((p) => NOT_PORTED.test(p))) {
+    return fail(503,
+      "Этот раздел временно недоступен: перенос на новый backend ещё не завершён. " +
+      "Генерация текста, история и Telegram-каналы работают полностью.");
+  }
   return fail(404, `Не найдено: ${method} ${url.pathname}`);
 });
