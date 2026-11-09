@@ -1,9 +1,9 @@
-name: Автопостинг в Telegram-каналы (cron)
+name: Автопостинг (cron → Supabase Edge Function)
 
-# Автопостинг выполняется ПРЯМО В GitHub Actions.
-# Раннер GitHub находится вне РФ, поэтому Telegram Bot API и Groq доступны.
-# Backend поднимается локально в раннере и вызывает свой же эндпоинт
-# /api/cron/autopost, работая с базой Supabase (секрет DATABASE_URL).
+# Автопостинг выполняет Edge Function `api` на Supabase: она работает
+# постоянно и не «засыпает». GitHub Actions лишь дёргает её по расписанию,
+# поэтому раннеру не нужны ни Python, ни токены Telegram/LLM —
+# достаточно секрета CRON_SECRET.
 on:
   schedule:
     - cron: "0 */2 * * *"   # каждые 2 часа по UTC
@@ -17,44 +17,17 @@ jobs:
   autopost:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Установить зависимости backend
-        run: pip install -r backend/requirements.txt
-
-      - name: Запустить backend и выполнить автопостинг
+      - name: Запустить автопостинг через Supabase Edge Function
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SECRET_KEY: ${{ secrets.SECRET_KEY }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          # Бесплатный LLM без ключа и регистрации (OpenAI-совместимый эндпоинт)
-          OPENAI_COMPAT_BASE_URL: https://text.pollinations.ai/openai
-          OPENAI_COMPAT_API_KEY: pollinations-not-needed
-          OPENAI_COMPAT_MODEL: openai
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          IG_CARDS_DIR: /tmp/ig_cards
-          MP_PHOTOS_DIR: /tmp/mp_photos
-          OZON_CACHE: /tmp/ozon_categories.json
-          FRONTEND_ORIGIN: https://admin-999.github.io
-          FRONTEND_URL: https://admin-999.github.io/ai-content-business
+          API_BASE: https://yapnxwamxmyobnffdhvu.supabase.co/functions/v1/api
         run: |
           set -e
-          mkdir -p /tmp/ig_cards /tmp/mp_photos
-          cd backend
-          uvicorn main:app --host 127.0.0.1 --port 8000 --log-level warning &
-          for i in $(seq 1 40); do
-            if curl -s -o /dev/null http://127.0.0.1:8000/api/health; then break; fi
-            sleep 1
-          done
           echo "--- health ---"
-          curl -s http://127.0.0.1:8000/api/health; echo
+          curl -s --max-time 60 "$API_BASE/api/health"; echo
           echo "--- autopost ---"
           code=$(curl -s --max-time 900 -o /tmp/resp.json -w "%{http_code}" \
-            -X POST "http://127.0.0.1:8000/api/cron/autopost" \
+            -X POST "$API_BASE/api/cron/autopost" \
             -H "X-Cron-Secret: $CRON_SECRET")
           echo "HTTP $code"
           cat /tmp/resp.json; echo

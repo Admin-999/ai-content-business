@@ -431,16 +431,6 @@ async function apiForm(path, formData, timeoutMs = 120000) {
     });
   }
 
-  $("wbDisconnectBtn").addEventListener("click", async () => {
-    try {
-      await api("/api/wb/account", { method: "DELETE" });
-      toast("Магазин отключён.", "success");
-      loadWbAccount();
-    } catch (err) {
-      toast(err.message, "error");
-    }
-  });
-
   const WB_STATUS = {
     published: ["Опубликована", "text-emerald-300"],
     ready: ["Готова к публикации вручную", "text-sky-300"],
