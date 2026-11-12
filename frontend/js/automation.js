@@ -31,6 +31,28 @@ async function apiForm(path, formData, timeoutMs = 120000) {
   return data;
 }
 
+// Рисует картинку товара прямо в браузере (ключевой Pollinations — без водяного
+// знака) и возвращает её как File для загрузки на сервер. Так надёжнее: серверный
+// генератор картинок бесплатного тарифа зависает и упирается в лимит времени.
+async function pollinationsPhotoFile(name) {
+  const urls = [];
+  const imgs = (typeof buildImageUrls === "function") ? buildImageUrls(name, "product") : null;
+  if (imgs) {
+    if (imgs.primary) urls.push(imgs.primary);
+    if (imgs.fallback) urls.push(imgs.fallback);
+  }
+  for (const url of urls) {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) continue;
+      const blob = await resp.blob();
+      if (!blob || blob.size < 1024) continue;
+      return new File([blob], "product.jpg", { type: blob.type || "image/jpeg" });
+    } catch (e) { /* пробуем следующий адрес */ }
+  }
+  return null;
+}
+
 (function initAutomation() {
   if (!document.getElementById("automation")) return;
   if (!localStorage.getItem("ac_token")) return;
@@ -542,25 +564,34 @@ async function apiForm(path, formData, timeoutMs = 120000) {
 
   $("wbCardForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const file = $("wbPhoto").files[0];
+    let file = $("wbPhoto").files[0];
     const name = $("wbName").value.trim();
     if (name.length < 3) return toast("Введите название товара: минимум 3 символа.", "error");
     const price = parseInt($("wbPrice").value, 10);
     if (!price || price < 1) return toast("Укажите цену в рублях, например 590.", "error");
     if (file && file.size > 8 * 1024 * 1024) return toast("Фото больше 8 МБ — выберите поменьше.", "error");
 
-    const fd = new FormData();
-    if (file) fd.append("photo", file);
-    fd.append("name", name);
-    fd.append("price_rub", String(price));
-    fd.append("platform", $("wbPlatform").value);
-
     const btn = $("wbCardBtn");
     btn.disabled = true;
-    btn.innerHTML = file
-      ? '<span class="spinner"></span>ИИ рассматривает фото… до минуты'
-      : '<span class="spinner"></span>ИИ рисует товар и пишет карточку… до минуты';
     try {
+      if (!file) {
+        // Фото нет — рисуем товар прямо в браузере (без водяного знака) и
+        // отправляем картинку как фото.
+        btn.innerHTML = '<span class="spinner"></span>ИИ рисует товар… до минуты';
+        file = await pollinationsPhotoFile(name);
+        if (!file) {
+          toast("Не удалось нарисовать картинку товара. Попробуйте ещё раз или загрузите своё фото.", "error");
+          return;
+        }
+      }
+
+      const fd = new FormData();
+      fd.append("photo", file);
+      fd.append("name", name);
+      fd.append("price_rub", String(price));
+      fd.append("platform", $("wbPlatform").value);
+
+      btn.innerHTML = '<span class="spinner"></span>ИИ рассматривает фото… до минуты';
       const data = await apiForm("/api/wb/cards", fd);
       renderWbResult(data);
       toast("Карточка готова! Осталось генераций сегодня: " + data.remaining, "success");
