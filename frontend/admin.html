@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Админ-панель — AI Контент</title>
+  <meta name="theme-color" content="#020617">
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%234f46e5'/%3E%3Ctext x='50' y='70' font-family='Arial,sans-serif' font-size='48' font-weight='bold' text-anchor='middle' fill='white'%3EAI%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://cdn.tailwindcss.com">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased" data-page="admin">
+
+  <header class="border-b border-white/10 bg-slate-950/80 backdrop-blur">
+    <nav class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <a href="index.html" class="flex items-center gap-2 text-lg font-bold">
+        <span class="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">AI Контент</span>
+        <span class="rounded-full border border-indigo-400/40 bg-indigo-500/15 px-2 py-0.5 text-xs font-semibold text-indigo-200">АДМИН</span>
+      </a>
+      <div class="flex items-center gap-3 text-sm">
+        <span id="adminEmail" class="hidden text-slate-400 sm:inline"></span>
+        <a href="dashboard.html" class="rounded-lg border border-white/15 px-3 py-1.5 text-slate-300 hover:bg-white/10">Кабинет</a>
+        <button id="logoutBtn" class="rounded-lg border border-white/15 px-3 py-1.5 text-slate-300 hover:bg-white/10">Выйти</button>
+      </div>
+    </nav>
+  </header>
+
+  <main class="mx-auto max-w-6xl px-4 py-8">
+
+    <!-- Вход (если админ ещё не вошёл) -->
+    <section id="adminLogin" class="mx-auto hidden max-w-md rounded-2xl border border-white/10 bg-slate-900/60 p-6">
+      <h1 class="text-xl font-bold">Вход в админ-панель</h1>
+      <p class="mt-1 text-sm text-slate-400">Доступ только для аккаунта администратора сайта.</p>
+      <form id="adminLoginForm" class="mt-5 space-y-4">
+        <div>
+          <label for="adminLoginEmail" class="mb-1 block text-sm font-medium text-slate-300">Email</label>
+          <input id="adminLoginEmail" type="email" class="field" autocomplete="username" placeholder="you@example.com">
+        </div>
+        <div>
+          <label for="adminLoginPassword" class="mb-1 block text-sm font-medium text-slate-300">Пароль</label>
+          <input id="adminLoginPassword" type="password" class="field" autocomplete="current-password" placeholder="••••••••">
+        </div>
+        <p id="adminLoginError" class="hidden text-sm text-rose-400"></p>
+        <button id="adminLoginBtn" type="submit" class="w-full rounded-xl bg-indigo-600 px-4 py-2.5 font-semibold text-white hover:bg-indigo-500 disabled:opacity-60">Войти</button>
+      </form>
+    </section>
+
+    <!-- Нет доступа: вошли под другим аккаунтом -->
+    <section id="adminDenied" class="mx-auto hidden max-w-md rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6">
+      <h1 class="text-lg font-bold text-amber-100">Нет доступа</h1>
+      <p class="mt-2 text-sm text-amber-100/90">
+        Вы вошли под аккаунтом <span id="deniedEmail" class="font-mono"></span>, а админ-панель доступна
+        только администратору сайта. Войдите под нужным аккаунтом.
+      </p>
+      <button id="deniedLoginBtn" class="mt-4 rounded-xl bg-indigo-600 px-4 py-2.5 font-semibold text-white hover:bg-indigo-500">Войти другим аккаунтом</button>
+    </section>
+
+    <!-- Сервер ещё не обновлён под админку -->
+    <section id="adminOutdated" class="mx-auto hidden max-w-xl rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6">
+      <h1 class="text-lg font-bold text-rose-100">Сервер ещё не поддерживает админ-функции</h1>
+      <p class="mt-2 text-sm text-rose-100/90">
+        Сам интерфейс админки готов, но серверная часть (маршруты <span class="font-mono">/api/admin/*</span>)
+        ещё не развёрнута на сервере. После публикации бэкенда эта страница заработает автоматически — перезайдите.
+      </p>
+      <button id="outdatedRetryBtn" class="mt-4 rounded-xl bg-indigo-600 px-4 py-2.5 font-semibold text-white hover:bg-indigo-500">Проверить снова</button>
+    </section>
+
+    <!-- Панель -->
+    <section id="adminPanel" class="hidden space-y-6">
+      <div>
+        <h1 class="text-2xl font-bold">Управление пользователями</h1>
+        <p class="mt-1 text-sm text-slate-400">Ищите пользователей, выдавайте и отзывайте подписки PRO / PRO+.</p>
+      </div>
+
+      <!-- Сводка -->
+      <div id="statsGrid" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"></div>
+
+      <!-- Поиск и фильтр -->
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div class="flex-1">
+            <label for="userSearch" class="mb-1 block text-sm font-medium text-slate-300">Поиск пользователя</label>
+            <input id="userSearch" class="field" placeholder="Email, имя или ID пользователя">
+          </div>
+          <button id="searchBtn" class="rounded-xl bg-indigo-600 px-4 py-2.5 font-semibold text-white hover:bg-indigo-500">Найти</button>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <span class="text-sm text-slate-400">Тариф:</span>
+          <button type="button" class="chip active" data-plan="">Все</button>
+          <button type="button" class="chip" data-plan="free">FREE</button>
+          <button type="button" class="chip" data-plan="pro">PRO</button>
+          <button type="button" class="chip" data-plan="pro_plus">PRO+</button>
+        </div>
+      </div>
+
+      <!-- Список -->
+      <div class="rounded-2xl border border-white/10 bg-slate-900/60 p-6">
+        <div class="flex items-center justify-between">
+          <h2 class="font-semibold">Пользователи</h2>
+          <span id="usersCount" class="text-sm text-slate-400"></span>
+        </div>
+        <div class="mt-4 overflow-x-auto">
+          <table class="w-full min-w-[720px] text-left text-sm">
+            <thead class="text-xs uppercase tracking-wide text-slate-500">
+              <tr class="border-b border-white/10">
+                <th class="py-2 pr-3 font-medium">Пользователь</th>
+                <th class="py-2 pr-3 font-medium">Тариф</th>
+                <th class="py-2 pr-3 font-medium">Активен до</th>
+                <th class="py-2 pr-3 font-medium">Сегодня</th>
+                <th class="py-2 pr-3 font-medium">Регистрация</th>
+                <th class="py-2 pl-3 text-right font-medium">Действия</th>
+              </tr>
+            </thead>
+            <tbody id="usersBody"></tbody>
+          </table>
+        </div>
+        <p id="usersEmpty" class="mt-4 hidden text-sm text-slate-400">Ничего не найдено. Попробуйте изменить запрос.</p>
+        <div class="mt-4 flex justify-center">
+          <button id="loadMoreBtn" class="hidden rounded-lg border border-white/15 px-4 py-2 text-sm text-slate-300 hover:bg-white/10">Показать ещё</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Модалка выдачи подписки -->
+  <div id="grantModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4">
+    <div class="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6">
+      <div class="flex items-start justify-between">
+        <div>
+          <h2 class="text-xl font-bold">Выдать подписку</h2>
+          <p id="grantUser" class="mt-1 text-sm text-slate-400"></p>
+        </div>
+        <button id="grantClose" class="text-2xl leading-none text-slate-400 hover:text-white" aria-label="Закрыть">&times;</button>
+      </div>
+      <form id="grantForm" class="mt-4 space-y-4">
+        <div>
+          <label for="grantPlan" class="mb-1 block text-sm text-slate-300">Тариф</label>
+          <select id="grantPlan" class="field">
+            <option value="pro">PRO — 100 генераций в день</option>
+            <option value="pro_plus">PRO+ — 300 генераций в день</option>
+            <option value="free">FREE — снять подписку</option>
+          </select>
+        </div>
+        <div id="grantDaysWrap">
+          <label for="grantDays" class="mb-1 block text-sm text-slate-300">Срок, дней</label>
+          <select id="grantDays" class="field">
+            <option value="7">7 дней</option>
+            <option value="30" selected>30 дней</option>
+            <option value="90">90 дней</option>
+            <option value="365">365 дней</option>
+          </select>
+        </div>
+        <p class="text-xs text-slate-500">Подписка выдаётся бесплатно (подарок). Деньги не списываются.</p>
+        <button id="grantSubmit" type="submit" class="w-full rounded-xl bg-indigo-600 px-4 py-2.5 font-semibold text-white hover:bg-indigo-500 disabled:opacity-60">Выдать</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="js/config.js?v=1"></script>
+  <script src="js/api.js?v=1"></script>
+  <script src="js/admin.js?v=1"></script>
+</body>
+</html>

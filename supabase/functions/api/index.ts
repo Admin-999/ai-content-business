@@ -1482,6 +1482,194 @@ route("GET", /^\/api\/subscription$/, async (ctx) => {
   });
 });
 
+// --- Админка: управление пользователями и подписками ------------------------
+// Доступ есть только у аккаунта из ADMIN_EMAIL (по умолчанию — владелец сайта).
+// Секрет ADMIN_EMAIL необязателен: без него работает адрес по умолчанию.
+const ADMIN_EMAIL = (Deno.env.get("ADMIN_EMAIL") || "vsvolodin2014@gmail.com").trim().toLowerCase();
+
+async function requireAdmin(req: Request): Promise<{ user?: UserRow; error?: Response }> {
+  const user = await currentUser(req);
+  if (!user) return { error: fail(401, "Требуется авторизация. Войдите в аккаунт.") };
+  if ((user.email || "").toLowerCase() !== ADMIN_EMAIL) {
+    return { error: fail(403, "Доступ только для администратора сайта.") };
+  }
+  return { user };
+}
+
+// Сводка: сколько всего пользователей, по тарифам, активные подписки, свежие регистрации.
+route("GET", /^\/api\/admin\/overview$/, async (ctx) => {
+  const guard = await requireAdmin(ctx.req);
+  if (guard.error) return guard.error;
+  const start = dayStartUtc();
+
+  const agg = await sql<{ total: number; free: number; pro: number; pro_plus: number }[]>`
+    SELECT COUNT(*)::int AS total,
+           COUNT(*) FILTER (WHERE plan = 'free')::int AS free,
+           COUNT(*) FILTER (WHERE plan = 'pro')::int AS pro,
+           COUNT(*) FILTER (WHERE plan = 'pro_plus')::int AS pro_plus
+    FROM users`;
+  const a = agg[0] || { total: 0, free: 0, pro: 0, pro_plus: 0 };
+
+  const newToday = await sql<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM users WHERE created_at >= ${start}`;
+  const genToday = await sql<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM generations WHERE created_at >= ${start}`;
+  const genAll = await sql<{ n: number }[]>`SELECT COUNT(*)::int AS n FROM generations`;
+  const active = await sql<{ n: number }[]>`
+    SELECT COUNT(*)::int AS n FROM users
+    WHERE plan <> 'free' AND plan_expires_at IS NOT NULL AND plan_expires_at > ${now()}`;
+  const recent = await sql<{ id: string; email: string; plan: string; created_at: Date | null }[]>`
+    SELECT id, email, plan, created_at FROM users ORDER BY created_at DESC LIMIT 8`;
+
+  return json({
+    admin_email: ADMIN_EMAIL,
+    users_total: Number(a.total),
+    plans: { free: Number(a.free), pro: Number(a.pro), pro_plus: Number(a.pro_plus) },
+    active_subscriptions: Number(active[0]?.n || 0),
+    new_today: Number(newToday[0]?.n || 0),
+    generations_today: Number(genToday[0]?.n || 0),
+    generations_total: Number(genAll[0]?.n || 0),
+    recent_users: recent.map((r) => ({ id: r.id, email: r.email, plan: r.plan, created_at: iso(r.created_at) })),
+  });
+});
+
+// Поиск и список пользователей. q — поиск по email, имени или id; plan — фильтр тарифа.
+route("GET", /^\/api\/admin\/users$/, async (ctx) => {
+  const guard = await requireAdmin(ctx.req);
+  if (guard.error) return guard.error;
+  const url = new URL(ctx.req.url);
+  const q = (url.searchParams.get("q") || "").trim();
+  const plan = (url.searchParams.get("plan") || "").trim();
+  let limit = parseInt(url.searchParams.get("limit") || "25", 10);
+  if (!Number.isFinite(limit) || limit < 1) limit = 25;
+  if (limit > 100) limit = 100;
+  let offset = parseInt(url.searchParams.get("offset") || "0", 10);
+  if (!Number.isFinite(offset) || offset < 0) offset = 0;
+
+  const like = `%${q.toLowerCase()}%`;
+  const start = dayStartUtc();
+  const rows = await sql<{
+    id: string; email: string; name: string | null; plan: string;
+    plan_expires_at: Date | null; created_at: Date | null;
+    used_today: number; total_generated: number;
+  }[]>`
+    SELECT u.id, u.email, u.name, u.plan, u.plan_expires_at, u.created_at,
+           (SELECT COUNT(*) FROM generations g WHERE g.user_id = u.id AND g.created_at >= ${start})::int AS used_today,
+           (SELECT COUNT(*) FROM generations g WHERE g.user_id = u.id)::int AS total_generated
+    FROM users u
+    WHERE (${q} = '' OR lower(u.email) LIKE ${like} OR lower(COALESCE(u.name, '')) LIKE ${like} OR u.id = ${q})
+      AND (${plan} = '' OR u.plan = ${plan})
+    ORDER BY u.created_at DESC
+    LIMIT ${limit} OFFSET ${offset}`;
+
+  const countRows = await sql<{ n: number }[]>`
+    SELECT COUNT(*)::int AS n FROM users u
+    WHERE (${q} = '' OR lower(u.email) LIKE ${like} OR lower(COALESCE(u.name, '')) LIKE ${like} OR u.id = ${q})
+      AND (${plan} = '' OR u.plan = ${plan})`;
+
+  return json({
+    total: Number(countRows[0]?.n || 0),
+    limit,
+    offset,
+    items: rows.map((r) => ({
+      id: r.id,
+      email: r.email,
+      name: r.name,
+      plan: r.plan,
+      plan_expires_at: iso(r.plan_expires_at),
+      created_at: iso(r.created_at),
+      used_today: Number(r.used_today),
+      total_generated: Number(r.total_generated),
+    })),
+  });
+});
+
+// Карточка одного пользователя: подписки и последние генерации.
+route("GET", /^\/api\/admin\/users\/([^/]+)$/, async (ctx, m) => {
+  const guard = await requireAdmin(ctx.req);
+  if (guard.error) return guard.error;
+  const uid = m[1];
+  const rows = await sql<UserRow[]>`
+    SELECT id, email, password_hash, plan, plan_expires_at, created_at FROM users WHERE id = ${uid} LIMIT 1`;
+  if (!rows.length) return fail(404, "Пользователь не найден.");
+  const u = rows[0];
+  const prof = await sql<{ name: string | null }[]>`SELECT name FROM users WHERE id = ${uid} LIMIT 1`;
+  const subs = await sql<{
+    plan: string; status: string; payment_ref: string | null; started_at: Date | null; expires_at: Date | null;
+  }[]>`SELECT plan, status, payment_ref, started_at, expires_at FROM subscriptions
+     WHERE user_id = ${uid} ORDER BY started_at DESC LIMIT 10`;
+  const gens = await sql<{ id: string; topic: string; created_at: Date | null }[]>`
+    SELECT id, topic, created_at FROM generations
+    WHERE user_id = ${uid} ORDER BY created_at DESC LIMIT 10`;
+
+  return json({
+    id: u.id,
+    email: u.email,
+    name: prof[0]?.name ?? null,
+    plan: u.plan,
+    plan_expires_at: iso(u.plan_expires_at),
+    created_at: iso(u.created_at),
+    used_today: await usedToday(uid),
+    daily_limit: dailyLimit(u.plan),
+    subscriptions: subs.map((s) => ({
+      plan: s.plan, status: s.status, payment_ref: s.payment_ref,
+      started_at: iso(s.started_at), expires_at: iso(s.expires_at),
+    })),
+    generations: gens.map((g) => ({ id: g.id, topic: g.topic, created_at: iso(g.created_at) })),
+  });
+});
+
+// Выдать подписку: plan = pro/pro_plus/free, days — срок в днях (по умолчанию 30).
+// plan=free просто сбрасывает тариф на бесплатный.
+route("POST", /^\/api\/admin\/users\/([^/]+)\/grant$/, async (ctx, m) => {
+  const guard = await requireAdmin(ctx.req);
+  if (guard.error) return guard.error;
+  const uid = m[1];
+  const body = await ctx.req.json().catch(() => ({}));
+  const plan = String(body.plan || "pro").trim();
+  if (!["free", "pro", "pro_plus"].includes(plan)) return fail(422, "Доступны тарифы: free, pro, pro_plus.");
+  let days = parseInt(body.days, 10);
+  if (!Number.isFinite(days) || days < 1) days = PRO_PERIOD_DAYS;
+  if (days > 3650) days = 3650;
+
+  const rows = await sql<{ id: string; email: string }[]>`
+    SELECT id, email FROM users WHERE id = ${uid} LIMIT 1`;
+  if (!rows.length) return fail(404, "Пользователь не найден.");
+  const email = rows[0].email;
+
+  if (plan === "free") {
+    await sql`UPDATE users SET plan = 'free', plan_expires_at = NULL WHERE id = ${uid}`;
+    return json({ id: uid, email, plan: "free", plan_expires_at: null, message: "Подписка отключена — тариф FREE." });
+  }
+
+  const started = now();
+  const expires = new Date(started.getTime() + days * 86400_000);
+  const price = plan === "pro" ? PRO_PRICE_RUB : PRO_PLUS_PRICE_RUB;
+  const paymentRef = `ADMIN-${uuid().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+  await sql`INSERT INTO subscriptions (id, user_id, plan, status, amount_rub, payment_ref, started_at, expires_at)
+            VALUES (${uuid()}, ${uid}, ${plan}, 'active', 0, ${paymentRef}, ${started}, ${expires})`;
+  await sql`UPDATE users SET plan = ${plan}, plan_expires_at = ${expires} WHERE id = ${uid}`;
+  const title = plan === "pro" ? "PRO" : "PRO+";
+  return json({
+    id: uid,
+    email,
+    plan,
+    plan_expires_at: iso(expires),
+    daily_limit: plan === "pro" ? LIMITS.pro : LIMITS.pro_plus,
+    payment_ref: paymentRef,
+    message: `Выдан тариф ${title} на ${days} дн. (подарок администратора).`,
+  });
+});
+
+// Отозвать подписку (сброс на FREE).
+route("POST", /^\/api\/admin\/users\/([^/]+)\/revoke$/, async (ctx, m) => {
+  const guard = await requireAdmin(ctx.req);
+  if (guard.error) return guard.error;
+  const uid = m[1];
+  const rows = await sql<{ email: string }[]>`SELECT email FROM users WHERE id = ${uid} LIMIT 1`;
+  if (!rows.length) return fail(404, "Пользователь не найден.");
+  await sql`UPDATE users SET plan = 'free', plan_expires_at = NULL WHERE id = ${uid}`;
+  return json({ id: uid, email: rows[0].email, plan: "free", message: "Подписка отключена — тариф FREE." });
+});
+
 // --- Каналы (Telegram + Instagram) ---
 const CHANNEL_COLS = `id, title, description, channel_username, tone, interval_hours, active,
   last_post_at, created_at, platform, ig_username, token_expires_at`;
