@@ -27,7 +27,15 @@ async function apiForm(path, formData, timeoutMs = 120000) {
     location.href = "index.html";
     throw new Error("Сессия истекла. Войдите заново.");
   }
-  if (!resp.ok) throw new Error((data && data.detail) || "Ошибка сервера (" + resp.status + ")");
+  if (!resp.ok) {
+    const err = new Error((data && data.detail) || "Ошибка сервера (" + resp.status + ")");
+    err.status = resp.status;
+    // Код помогает понять причину: сервер/ИИ упал — можно собрать карточку
+    // прямо в браузере; превышен лимит или неверный ввод — нельзя.
+    if (resp.status >= 500) err.code = "server";
+    else if (resp.status === 429) err.code = "limit";
+    throw err;
+  }
   return data;
 }
 
@@ -51,6 +59,105 @@ async function pollinationsPhotoFile(name) {
     } catch (e) { /* пробуем следующий адрес */ }
   }
   return null;
+}
+
+// Отображаемые названия маркетплейсов (используются и вне IIFE-обёртки ниже).
+const MP_NAMES = { wb: "Wildberries", ozon: "Ozon", aliexpress: "AliExpress", yamarket: "Яндекс Маркет" };
+
+// Описания под каждый маркетплейс — чтобы браузерная карточка была похожа на
+// серверную (те же персона и требования).
+const CARD_PERSONAS = {
+  wb: {
+    persona: "Ты — специалист по карточкам товаров Wildberries с опытом 10 лет.",
+    description: "продающее описание 500–800 символов, без указания цены",
+    characters: "6–10 шт.",
+    keywords: "10–15 поисковых слов через запятую",
+  },
+  ozon: {
+    persona: "Ты — специалист по карточкам товаров Ozon с опытом 10 лет.",
+    description: "продающее описание 500–1000 символов с выгодами для покупателя, без указания цены",
+    characters: "6–10 шт.",
+    keywords: "10–15 поисковых слов через запятую",
+  },
+  aliexpress: {
+    persona: "Ты — специалист по карточкам товаров AliExpress с опытом 10 лет.",
+    description: "простое продающее описание 300–600 символов короткими фразами, без указания цены",
+    characters: "6–10 шт.",
+    keywords: "10–15 поисковых слов через запятую: русские и 3–5 английских",
+  },
+  yamarket: {
+    persona: "Ты — специалист по карточкам товаров Яндекс Маркета с опытом 10 лет.",
+    description: "фактическое описание 500–800 символов: факты и преимущества без воды, без указания цены",
+    characters: "8–12 шт.",
+    keywords: "10–15 поисковых слов через запятую",
+  },
+};
+
+function cardPromptBrowser(name, price, platform, visionText) {
+  const mp = CARD_PERSONAS[platform] || CARD_PERSONAS.wb;
+  const visionLine = visionText ? "- Что видно на фото: " + visionText + "\n" : "";
+  return mp.persona + "\n" +
+    "Данные товара:\n- Название: " + name + "\n- Цена: " + price + " руб.\n" +
+    visionLine +
+    "Составь карточку товара. Верни СТРОГО один JSON-объект без markdown и пояснений:\n" +
+    '{"description": "' + mp.description + '", ' +
+    '"characteristics": [{"name": "название характеристики", "value": "значение"}] — ' + mp.characters + ', ' +
+    '"keywords": "' + mp.keywords + '"}';
+}
+
+function parseCardJson(text) {
+  const s = String(text || "");
+  const start = s.indexOf("{");
+  const end = s.lastIndexOf("}");
+  if (start === -1 || end <= start) return null;
+  try { return JSON.parse(s.slice(start, end + 1)); } catch (e) { return null; }
+}
+
+// Пишет карточку товара прямо в браузере через Pollinations. Пробует модели по
+// очереди. Возвращает объект карточки либо null, если ничего не вышло.
+async function browserCardText(name, price, platform, visionText) {
+  const prompt = cardPromptBrowser(name, price, platform, visionText);
+  const attempts = [];
+  if (POLLI.BASE && POLLI.KEY && POLLI.MODELS && POLLI.MODELS.length) {
+    for (const m of POLLI.MODELS) {
+      attempts.push({ url: POLLI.BASE + "/chat/completions", headers: { "Authorization": "Bearer " + POLLI.KEY }, model: m });
+    }
+  }
+  if (POLLI.CLASSIC) attempts.push({ url: POLLI.CLASSIC, headers: {}, model: "openai" });
+  for (const a of attempts) {
+    try {
+      const text = await llmRequest(a.url, a.headers, a.model, prompt, 2048);
+      const card = parseCardJson(text);
+      if (card && String(card.description || "").trim()) return card;
+    } catch (e) { /* модель недоступна — пробуем следующую */ }
+  }
+  return null;
+}
+
+// Собирает объект карточки в том же виде, что отдаёт сервер, но без публикации.
+function browserCardResult(card, name, price, platform, file) {
+  let imageUrl = null;
+  try { if (file) imageUrl = URL.createObjectURL(file); } catch (e) { /* без превью */ }
+  return {
+    platform,
+    platform_name: MP_NAMES[platform] || "Wildberries",
+    name,
+    price_rub: price,
+    description: String(card.description || "").trim(),
+    characteristics: Array.isArray(card.characteristics) ? card.characteristics : [],
+    keywords: String(card.keywords || "").trim(),
+    image_url: imageUrl,
+    publish_status: "ready",
+    publish_subject: null,
+    publish_error: "Карточку собрал браузер: серверный ИИ был занят. Текст и характеристики можно скопировать и вставить в кабинет магазина вручную.",
+  };
+}
+
+// Серверный ИИ недоступен (упал, 402/5xx) — значит можно писать карточку в браузере.
+function isServerAiDown(err) {
+  if (!err) return false;
+  if (err.code === "server" || err.status >= 500) return true;
+  return /временно недоступен|провайдер вернул ошибку|не ответил|502|503/i.test(err.message || "");
 }
 
 (function initAutomation() {
@@ -304,7 +411,6 @@ async function pollinationsPhotoFile(name) {
   }
 
   // ===== Маркетплейсы (Wildberries, Ozon, AliExpress, Яндекс Маркет) =====
-  const MP_NAMES = { wb: "Wildberries", ozon: "Ozon", aliexpress: "AliExpress", yamarket: "Яндекс Маркет" };
   const MP_BOXES = { wb: "wbStoreBox", ozon: "ozonStoreBox", yamarket: "ymStoreBox", aliexpress: "aliStoreBox" };
   const mpChips = Array.from(document.querySelectorAll("#mpChips .chip"));
 
@@ -592,7 +698,20 @@ async function pollinationsPhotoFile(name) {
       fd.append("platform", $("wbPlatform").value);
 
       btn.innerHTML = '<span class="spinner"></span>ИИ рассматривает фото… до минуты';
-      const data = await apiForm("/api/wb/cards", fd);
+      let data = null;
+      try {
+        data = await apiForm("/api/wb/cards", fd);
+      } catch (err) {
+        // Серверный ИИ недоступен (лимит бесплатного провайдера) — собираем
+        // карточку прямо в браузере, чтобы пользователь не остался ни с чем.
+        if (!isServerAiDown(err)) throw err;
+        btn.innerHTML = '<span class="spinner"></span>Сервер занят — пишем карточку в браузере…';
+        const card = await browserCardText(name, price, $("wbPlatform").value, null);
+        if (!card) throw err;
+        renderWbResult(browserCardResult(card, name, price, $("wbPlatform").value, file));
+        toast("Серверный ИИ был занят — карточку собрал браузер. Проверьте текст перед использованием.", "success");
+        return;
+      }
       renderWbResult(data);
       toast("Карточка готова! Осталось генераций сегодня: " + data.remaining, "success");
       loadWbCards();
