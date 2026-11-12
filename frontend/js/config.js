@@ -22,7 +22,13 @@ window.APP_CONFIG = {
     ],
     // Резервный вариант без ключа (одна бесплатная модель, лимит 1 запрос/45 с).
     CLASSIC: "https://text.pollinations.ai/openai/chat/completions",
-    // Генерация картинок без ключа.
-    IMAGE: "https://image.pollinations.ai/prompt/",
+
+    // --- Картинки ---
+    // С ключом — качественная модель без водяного знака (расходует бесплатный
+    // Pollen: ~0.004 за картинку 1024x1024).
+    IMAGE_KEYED: "https://gen.pollinations.ai/image/",
+    IMAGE_MODEL: "z-image-turbo",
+    // Резерв без ключа — работает всегда, но с водяным знаком pollinations.ai.
+    IMAGE_FALLBACK: "https://image.pollinations.ai/prompt/",
   },
 };

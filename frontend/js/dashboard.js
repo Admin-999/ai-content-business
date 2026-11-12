@@ -59,22 +59,33 @@ async function loadUsage() {
   }
 }
 
-function showResultImage(url) {
+function showResultImage(url, fallbackUrl) {
   const img = $("resultImage");
   const link = $("resultImageLink");
   if (!img || !link) return;
-  if (url) {
-    // Если картинку не удалось получить (лимит/сеть) — просто прячем её.
-    img.onerror = () => { img.classList.add("hidden"); link.classList.add("hidden"); };
-    img.src = url;
-    img.classList.remove("hidden");
-    link.href = url;
-    link.classList.remove("hidden");
-  } else {
+  if (!url) {
     img.removeAttribute("src");
     img.classList.add("hidden");
     link.classList.add("hidden");
+    return;
   }
+  let usedFallback = false;
+  // Если основная картинка не отдалась (лимит/нет Pollen) — пробуем резервную,
+  // и только если и она не вышла, прячем картинку.
+  img.onerror = () => {
+    if (!usedFallback && fallbackUrl) {
+      usedFallback = true;
+      img.src = fallbackUrl;
+      link.href = fallbackUrl;
+      return;
+    }
+    img.classList.add("hidden");
+    link.classList.add("hidden");
+  };
+  img.src = url;
+  img.classList.remove("hidden");
+  link.href = url;
+  link.classList.remove("hidden");
 }
 
 function renderHistory(items) {
@@ -159,16 +170,21 @@ function buildPrompt(topic, contentType, tone, language) {
   );
 }
 
-// Адрес картинки, которую браузер сгенерирует через Pollinations (без ключа).
-function pollinationsImageUrl(topic, contentType) {
-  if (!POLLI.IMAGE) return null;
+// Готовит адреса картинки по теме.
+// primary — через ключ (качественная модель, без водяного знака);
+// fallback — без ключа (работает всегда, но с водяным знаком pollinations.ai).
+function buildImageUrls(topic, contentType) {
   const style = contentType === "product"
-    ? "professional product photo, clean bright background, studio lighting, high detail, centered"
-    : "bright modern illustration, high quality, detailed";
-  const prompt = topic + ". " + style + ", no watermark, no text, no letters";
+    ? "professional product photo on a clean bright background, studio lighting, high detail, centered"
+    : "professional realistic photo, bright, clean, high detail, modern";
+  const prompt = encodeURIComponent(topic + ". " + style + ", no text, no letters, no watermark");
   const seed = Math.floor(Math.random() * 1000000000);
-  return POLLI.IMAGE + encodeURIComponent(prompt) +
-    "?width=1024&height=1024&nologo=true&seed=" + seed;
+  const q = "?width=1024&height=1024&seed=" + seed;
+  const keyed = (POLLI.IMAGE_KEYED && POLLI.KEY)
+    ? POLLI.IMAGE_KEYED + prompt + q + "&nologo=true&model=" + (POLLI.IMAGE_MODEL || "flux") + "&key=" + encodeURIComponent(POLLI.KEY)
+    : null;
+  const fallback = POLLI.IMAGE_FALLBACK ? POLLI.IMAGE_FALLBACK + prompt + q + "&nologo=true" : null;
+  return { primary: keyed || fallback, fallback: keyed ? fallback : null };
 }
 
 // Один запрос к OpenAI-совместимому эндпоинту. Бросает исключение при ошибке.
@@ -258,7 +274,8 @@ async function generate(e) {
   btn.innerHTML = '<span class="spinner"></span>Генерируем… до минуты';
 
   try {
-    let content, model, imageUrl = null, remaining = null, offline = false;
+    const imgs = buildImageUrls(topic, contentType);
+    let content, model, serverImage = null, remaining = null, offline = false;
     try {
       const data = await api("/api/generate", {
         method: "POST",
@@ -266,7 +283,7 @@ async function generate(e) {
       });
       content = data.content;
       model = data.model;
-      imageUrl = data.image_url || null;
+      serverImage = data.image_url || null;
       remaining = data.remaining;
     } catch (err) {
       // Сервер недоступен или упал — генерируем прямо в браузере через Pollinations.
@@ -275,13 +292,14 @@ async function generate(e) {
       const local = await generateOffline(topic, contentType, tone, language);
       content = local.content;
       model = local.model;
-      imageUrl = pollinationsImageUrl(topic, contentType);
       offline = true;
     }
 
     $("resultCard").classList.remove("hidden");
     $("resultText").textContent = content;
-    showResultImage(imageUrl);
+    // Картинку всегда рисуем через Pollinations: с ключом она без водяного знака.
+    // Резерв — картинка сервера (если была) либо вариант без ключа.
+    showResultImage(imgs.primary, serverImage || imgs.fallback);
     $("resultCard").scrollIntoView({ behavior: "smooth", block: "nearest" });
 
     if (offline) {
