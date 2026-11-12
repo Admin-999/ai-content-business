@@ -64,6 +64,8 @@ function showResultImage(url) {
   const link = $("resultImageLink");
   if (!img || !link) return;
   if (url) {
+    // Если картинку не удалось получить (лимит/сеть) — просто прячем её.
+    img.onerror = () => { img.classList.add("hidden"); link.classList.add("hidden"); };
     img.src = url;
     img.classList.remove("hidden");
     link.href = url;
@@ -129,13 +131,13 @@ async function loadHistory() {
   }
 }
 
-// --- Генерация без сервера ------------------------------------------------
-// Если backend недоступен, текст создаётся прямо в браузере через свободный
-// OpenAI-совместимый эндпоинт (ключ не нужен). Так генерация работает, даже
-// когда API-сервер выключен. Лимиты тарифа в этом режиме не считаются,
-// а результат сохраняется в истории браузера.
-const FREE_LLM_URL = "https://text.pollinations.ai/openai/chat/completions";
-const FREE_LLM_MODEL = "openai";
+// --- Генерация без сервера (прямо в браузере через Pollinations) ----------
+// Если backend недоступен или вернул ошибку, текст и картинка создаются прямо
+// в браузере через Pollinations. Сначала пробуем бесплатные модели с ключом
+// (список в config.js), затем — резервную бесплатную модель без ключа. Так
+// генерация работает даже когда API-сервер выключен. Лимиты тарифа в этом
+// режиме не считаются, результат сохраняется в истории браузера.
+const POLLI = (window.APP_CONFIG && window.APP_CONFIG.POLLINATIONS) || {};
 
 const GEN_TASKS = {
   post: "Напиши вовлекающий пост для социальных сетей на тему: «{topic}». Объём 150–250 слов. Первый абзац должен цеплять внимание. В конце добавь призыв к действию и 3–5 хештегов.",
@@ -157,35 +159,68 @@ function buildPrompt(topic, contentType, tone, language) {
   );
 }
 
-async function generateOffline(topic, contentType, tone, language) {
+// Адрес картинки, которую браузер сгенерирует через Pollinations (без ключа).
+function pollinationsImageUrl(topic, contentType) {
+  if (!POLLI.IMAGE) return null;
+  const style = contentType === "product"
+    ? "professional product photo, clean bright background, studio lighting, high detail, centered"
+    : "bright modern illustration, high quality, detailed";
+  const prompt = topic + ". " + style + ", no watermark, no text, no letters";
+  const seed = Math.floor(Math.random() * 1000000000);
+  return POLLI.IMAGE + encodeURIComponent(prompt) +
+    "?width=1024&height=1024&nologo=true&seed=" + seed;
+}
+
+// Один запрос к OpenAI-совместимому эндпоинту. Бросает исключение при ошибке.
+async function llmRequest(url, headers, model, prompt, maxTokens) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 120000);
-  let resp;
+  const timer = setTimeout(() => ctrl.abort(), 90000);
   try {
-    resp = await fetch(FREE_LLM_URL, {
+    const resp = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: Object.assign({ "Content-Type": "application/json" }, headers || {}),
       body: JSON.stringify({
-        model: FREE_LLM_MODEL,
-        messages: [{ role: "user", content: buildPrompt(topic, contentType, tone, language) }],
-        max_tokens: 2048,
+        model: model,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: maxTokens,
         temperature: 0.8,
       }),
       signal: ctrl.signal,
     });
-  } catch (e) {
-    throw new Error("Не удалось связаться с ИИ. Проверьте интернет и нажмите кнопку ещё раз.");
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    let data = null;
+    try { data = await resp.json(); } catch (e) { data = null; }
+    const text = (((data || {}).choices || [{}])[0].message || {}).content || "";
+    if (!text.trim()) throw new Error("empty");
+    return text.trim();
   } finally {
     clearTimeout(timer);
   }
-  if (!resp.ok) {
-    throw new Error("Не удалось сгенерировать текст (ошибка " + resp.status + "). Попробуйте ещё раз.");
+}
+
+async function generateOffline(topic, contentType, tone, language) {
+  const prompt = buildPrompt(topic, contentType, tone, language);
+  const attempts = [];
+  if (POLLI.BASE && POLLI.KEY && POLLI.MODELS && POLLI.MODELS.length) {
+    for (const m of POLLI.MODELS) {
+      attempts.push({ url: POLLI.BASE + "/chat/completions", headers: { "Authorization": "Bearer " + POLLI.KEY }, model: m, label: m });
+    }
   }
-  let data = null;
-  try { data = await resp.json(); } catch (e) { data = null; }
-  const text = (((data || {}).choices || [{}])[0].message || {}).content || "";
-  if (!text.trim()) throw new Error("ИИ вернул пустой ответ. Попробуйте ещё раз.");
-  return { content: text.trim(), model: "browser:" + FREE_LLM_MODEL };
+  if (POLLI.CLASSIC) {
+    attempts.push({ url: POLLI.CLASSIC, headers: {}, model: "openai", label: "free:openai-fast" });
+  }
+  if (!attempts.length) {
+    throw new Error("ИИ временно недоступен. Попробуйте позже.");
+  }
+  for (const a of attempts) {
+    try {
+      const text = await llmRequest(a.url, a.headers, a.model, prompt, 2048);
+      return { content: text, model: "browser:" + a.label };
+    } catch (e) {
+      // Модель недоступна — пробуем следующую.
+    }
+  }
+  throw new Error("ИИ немного перегружен. Подождите минуту и нажмите «Сгенерировать» ещё раз.");
 }
 
 function saveLocalGeneration(topic, contentType, model, content) {
@@ -234,11 +269,13 @@ async function generate(e) {
       imageUrl = data.image_url || null;
       remaining = data.remaining;
     } catch (err) {
-      // Сервер недоступен — генерируем прямо в браузере.
-      if (err.code !== "offline" && err.code !== "timeout") throw err;
+      // Сервер недоступен или упал — генерируем прямо в браузере через Pollinations.
+      const code = err && err.code;
+      if (code !== "offline" && code !== "timeout" && code !== "server") throw err;
       const local = await generateOffline(topic, contentType, tone, language);
       content = local.content;
       model = local.model;
+      imageUrl = pollinationsImageUrl(topic, contentType);
       offline = true;
     }
 
@@ -249,7 +286,7 @@ async function generate(e) {
 
     if (offline) {
       saveLocalGeneration(topic, contentType, model, content);
-      toast("Готово! Сервер недоступен — текст создан прямо в браузере.", "success");
+      toast("Готово! Текст и картинка созданы прямо в браузере.", "success");
     } else {
       toast("Готово! Осталось генераций сегодня: " + remaining, "success");
       loadUsage();

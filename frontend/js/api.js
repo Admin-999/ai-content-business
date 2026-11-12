@@ -66,14 +66,20 @@ async function api(path, { method = "GET", body = null, auth = true, retry = met
 
   if (!resp.ok) {
     const detail = data && data.detail;
-    if (detail) throw new Error(detail);
-    if (resp.status === 404) {
-      const err = new Error("Сервис недоступен (404): backend выключен или переезжает. Попробуйте позже.");
-      err.code = "offline";
-      throw err;
-    }
-    if (resp.status >= 500) throw new Error("Сервис временно недоступен (" + resp.status + "). Попробуйте через минуту.");
-    throw new Error("Ошибка сервера (" + resp.status + ")");
+    const err = new Error(
+      detail ||
+        (resp.status === 404
+          ? "Сервис недоступен (404): backend выключен или переезжает. Попробуйте позже."
+          : resp.status >= 500
+            ? "Сервис временно недоступен (" + resp.status + "). Попробуйте через минуту."
+            : "Ошибка сервера (" + resp.status + ")"),
+    );
+    // Код помогает интерфейсу понять причину: сервер упал/недоступен — можно
+    // сгенерировать прямо в браузере; превышен лимит/невалидный ввод — нельзя.
+    if (resp.status === 404) err.code = "offline";
+    else if (resp.status >= 500) err.code = "server";
+    else if (resp.status === 429) err.code = "limit";
+    throw err;
   }
   return data;
 }
