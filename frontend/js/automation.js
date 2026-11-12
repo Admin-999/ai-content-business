@@ -186,6 +186,7 @@ function isServerAiDown(err) {
     $("tgUsernameField").classList.toggle("hidden", isIg);
     $("igSetupHint").classList.toggle("hidden", !isIg);
     $("tgSetupHint").classList.toggle("hidden", isIg);
+    if ($("tgBotBox")) $("tgBotBox").classList.toggle("hidden", isIg);
   }
   platformChips.forEach((chip) => chip.addEventListener("click", () => selectPlatform(chip.dataset.v)));
 
@@ -402,12 +403,24 @@ function isServerAiDown(err) {
     }
   });
 
+  let botUsername = "";
   async function loadChannelSetup() {
+    const setNames = (t) => document.querySelectorAll(".service-bot-name").forEach((el) => { el.textContent = t; });
     try {
       const data = await api("/api/channels/setup");
-      const name = data.bot_username ? "@" + data.bot_username : "нашего бота";
-      document.querySelectorAll(".service-bot-name").forEach((el) => { el.textContent = name; });
-    } catch (err) { /* имя бота не критично для работы */ }
+      botUsername = data.bot_username ? "@" + data.bot_username : "";
+      setNames(botUsername || "нашего бота");
+    } catch (err) {
+      setNames("нашего бота");
+    }
+  }
+
+  if ($("botCopyBtn")) {
+    $("botCopyBtn").addEventListener("click", async () => {
+      if (!botUsername) return toast("Имя бота ещё загружается — попробуйте через пару секунд.", "error");
+      const ok = await copyText(botUsername);
+      toast(ok ? "Скопировано: " + botUsername : "Не удалось скопировать", ok ? "success" : "error");
+    });
   }
 
   // ===== Маркетплейсы (Wildberries, Ozon, AliExpress, Яндекс Маркет) =====
