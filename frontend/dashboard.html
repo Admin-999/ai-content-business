@@ -398,7 +398,7 @@
     </section>
   </main>
 
-  <!-- Модальное окно оплаты: ЗАГЛУШКА под Stripe. Реальные деньги не списываются. -->
+  <!-- Модальное окно оплаты: ЗАГЛУШКА. Реальные деньги не списываются. Оплата будет через Robokassa. -->
   <div id="payModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4">
     <div class="w-full max-w-md rounded-2xl border border-white/10 bg-slate-900 p-6">
       <div class="flex items-start justify-between">
@@ -409,7 +409,7 @@
         <button id="payClose" class="text-2xl leading-none text-slate-400 hover:text-white" aria-label="Закрыть">&times;</button>
       </div>
       <div class="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
-        Тестовый режим оплаты: введите любые данные карты, деньги не списываются. В продакшене здесь будет Stripe Checkout.
+        Тестовый режим оплаты: реальный приём платежей ещё не подключён, деньги не списываются. Оплата будет проходить через сервис Robokassa (карты РФ и СБП).
       </div>
       <form id="payForm" class="mt-4 space-y-4">
         <div>
