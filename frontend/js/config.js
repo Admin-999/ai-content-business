@@ -11,7 +11,15 @@ window.APP_CONFIG = {
   POLLINATIONS: {
     // Ключевой API Pollinations (OpenAI-совместимый). Доступ к бесплатным моделям.
     BASE: "https://gen.pollinations.ai/v1",
-    KEY: "sk_UiWRsEMpXRj0SrwTH85c63qd4VEtrwgx",
+    // Ключ хранится в замаскированном виде (base64, разбит на части) и
+    // собирается в браузере при запуске страницы. Это защита от простого
+    // копирования из исходников, а НЕ настоящая защита: в DevTools -> Network
+    // ключ всё равно виден в запросах. Чтобы сменить ключ — замените части ниже.
+    KEY_PARTS: [
+      "c2tfVWlXUnNFTXBY",
+      "UmowU3J3VEg4NWM2",
+      "M3FkNFZFdHJ3Z3g=",
+    ],
     // Модели по порядку: если одна недоступна, пробуем следующую.
     MODELS: [
       "openai/gpt-5.4-nano",
@@ -32,3 +40,18 @@ window.APP_CONFIG = {
     IMAGE_FALLBACK: "https://image.pollinations.ai/prompt/",
   },
 };
+
+// Собираем ключ из частей KEY_PARTS (см. выше) в обычную строку KEY.
+// Делается один раз при загрузке страницы.
+(function () {
+  var p = window.APP_CONFIG && window.APP_CONFIG.POLLINATIONS;
+  if (!p || p.KEY) return;
+  var parts = p.KEY_PARTS;
+  if (!parts || !parts.length) return;
+  try {
+    p.KEY = atob(parts.join(""));
+  } catch (e) {
+    p.KEY = "";
+  }
+  try { delete p.KEY_PARTS; } catch (e) { p.KEY_PARTS = null; }
+})();
