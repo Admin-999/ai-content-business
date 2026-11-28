@@ -318,61 +318,10 @@ async function generate(e) {
   }
 }
 
-// --- Модалка оплаты (заглушка; реальная оплата будет через Robokassa) ---
-const PAY_PLANS = {
-  pro: { title: "Оформление PRO", subtitle: "299 ₽ / 30 дней · 100 генераций в день", button: "Оплатить 299 ₽" },
-  pro_plus: { title: "Оформление PRO+", subtitle: "990 ₽ / 30 дней · 300 генераций в день", button: "Оплатить 990 ₽" },
-};
-
-let payPlan = "pro";
-
+// --- Оплата: отдельная страница pay.html (СБП, выбор банка) ---
 function openPay(plan) {
-  payPlan = PAY_PLANS[plan] ? plan : "pro";
-  $("payTitle").textContent = PAY_PLANS[payPlan].title;
-  $("paySubtitle").textContent = PAY_PLANS[payPlan].subtitle;
-  $("payBtn").textContent = PAY_PLANS[payPlan].button;
-  $("payModal").classList.remove("hidden");
-  $("payModal").classList.add("flex");
-}
-function closePay() {
-  $("payModal").classList.add("hidden");
-  $("payModal").classList.remove("flex");
-}
-
-async function pay(e) {
-  e.preventDefault();
-  const errEl = $("payError");
-  errEl.classList.add("hidden");
-
-  const num = $("cardNumber").value.replace(/\s+/g, "");
-  const exp = $("cardExp").value.trim();
-  const cvc = $("cardCvc").value.trim();
-  if (!/^\d{12,19}$/.test(num)) return showPayError("Введите номер карты (12–19 цифр). Это тест: подойдут любые цифры.");
-  if (!/^\d{2}\/\d{2}$/.test(exp)) return showPayError("Срок карты в формате ММ/ГГ, например 12/29.");
-  if (!/^\d{3,4}$/.test(cvc)) return showPayError("CVC — 3 цифры на обороте карты.");
-
-  const btn = $("payBtn");
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Обработка платежа…';
-  try {
-    const data = await api("/api/subscribe", {
-      method: "POST",
-      body: { plan: payPlan, card_number: num, card_exp: exp, card_cvc: cvc },
-    });
-    closePay();
-    toast(data.message, "success");
-    loadUsage();
-  } catch (err) {
-    showPayError(err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = PAY_PLANS[payPlan].button;
-  }
-}
-
-function showPayError(msg) {
-  $("payError").textContent = msg;
-  $("payError").classList.remove("hidden");
+  const p = plan === "pro_plus" ? "pro_plus" : "pro";
+  location.href = "pay.html?plan=" + p;
 }
 
 // --- Профиль: имя и аватар ---
@@ -553,20 +502,6 @@ async function saveProfile(e) {
   });
   $("upgradeBtn").addEventListener("click", () => openPay("pro"));
   $("upgradeBtnPlus").addEventListener("click", () => openPay("pro_plus"));
-  $("payClose").addEventListener("click", closePay);
-  $("payModal").addEventListener("click", (e) => { if (e.target === $("payModal")) closePay(); });
-  $("payForm").addEventListener("submit", pay);
-
-  // Маска номера карты: группы по 4 цифры
-  $("cardNumber").addEventListener("input", (e) => {
-    const digits = e.target.value.replace(/\D/g, "").slice(0, 19);
-    e.target.value = digits.replace(/(.{4})/g, "$1 ").trim();
-  });
-  // Маска срока: ММ/ГГ
-  $("cardExp").addEventListener("input", (e) => {
-    const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
-    e.target.value = digits.length > 2 ? digits.slice(0, 2) + "/" + digits.slice(2) : digits;
-  });
 
   const cachedUsage = localStorage.getItem("ac_usage");
   if (cachedUsage) {
@@ -581,9 +516,8 @@ async function saveProfile(e) {
   loadHistory();
   loadProfile();
 
-  // Открытие модалки оплаты по прямой ссылке dashboard.html#upgrade (с лендинга)
+  // Переход к оплате по прямой ссылке dashboard.html#upgrade (с лендинга)
   if (location.hash === "#upgrade") {
     openPay("pro");
-    history.replaceState(null, "", location.pathname);
   }
 })();

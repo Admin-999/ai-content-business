@@ -108,8 +108,9 @@ document.querySelectorAll("[data-auth]").forEach((btn) => {
 
 document.querySelectorAll("[data-upgrade]").forEach((btn) => {
   btn.addEventListener("click", () => {
+    const plan = btn.dataset.plan === "pro_plus" ? "pro_plus" : "pro";
     if (localStorage.getItem("ac_token")) {
-      location.href = "dashboard.html#upgrade";
+      location.href = "pay.html?plan=" + plan;
     } else {
       openAuth("register");
       toast("Сначала создайте бесплатный аккаунт — это займёт 20 секунд.", "info");
